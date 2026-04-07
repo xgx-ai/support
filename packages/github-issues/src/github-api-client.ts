@@ -5,21 +5,36 @@ import { createGitHubAppJwt } from "./github-app-jwt";
 
 const GH_BASE_URL = "https://api.github.com";
 
+/** Owner is always xgx-ai for all consuming projects. */
+const OWNER = "xgx-ai";
+
+let _repoName: string | undefined;
+
+/** Override the target repo name. If not called, falls back to GITHUB_REPO_NAME env var. */
+export function setRepoName(name: string) {
+  _repoName = name;
+}
+
 function getAppConfig() {
   const appId = process.env.GITHUB_APP_ID;
   const installationId = process.env.GITHUB_APP_INSTALLATION_ID;
   const privateKeyBase64 = process.env.GITHUB_APP_PRIVATE_KEY_BASE64;
-  const owner = process.env.GITHUB_REPO_OWNER;
-  const repo = process.env.GITHUB_REPO_NAME;
+  const repo = _repoName ?? process.env.GITHUB_REPO_NAME;
 
-  if (!appId || !installationId || !privateKeyBase64 || !owner || !repo) {
+  if (!appId || !installationId || !privateKeyBase64) {
     throw new Error(
-      "GITHUB_APP_ID, GITHUB_APP_INSTALLATION_ID, GITHUB_APP_PRIVATE_KEY_BASE64, GITHUB_REPO_OWNER, and GITHUB_REPO_NAME must be set.",
+      "GITHUB_APP_ID, GITHUB_APP_INSTALLATION_ID, and GITHUB_APP_PRIVATE_KEY_BASE64 must be set.",
+    );
+  }
+
+  if (!repo) {
+    throw new Error(
+      "Repo name not set. Call setRepoName() or set GITHUB_REPO_NAME env var.",
     );
   }
 
   const privateKey = atob(privateKeyBase64);
-  return { appId, installationId, privateKey, owner, repo };
+  return { appId, installationId, privateKey, owner: OWNER, repo };
 }
 
 // --- Installation Token Cache ---
