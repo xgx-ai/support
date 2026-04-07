@@ -159,9 +159,9 @@ async function handleCreateComment(
  */
 export function createIssuesRouter<
   TRoot extends AnyTRPCRootTypes,
-  TContext extends { user: { name?: string | null } },
+  TContext,
   TMeta,
-  TContextOverrides extends TContext,
+  TContextOverrides extends { user: { name?: string | null } },
 >(
   router: TRPCRouterBuilder<TRoot>,
   protectedProcedure: TRPCProcedureBuilder<
