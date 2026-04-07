@@ -1,6 +1,6 @@
 // GitHub Issues integration package
 // Provides GitHub App authentication, REST API client, endmatter helpers,
-// and pre-built handler functions + Zod schemas for tRPC wiring.
+// and a tRPC router factory for GitHub-backed issue tracking.
 
 export {
   createGitHubAppJwt,
@@ -21,17 +21,4 @@ export {
 
 export { buildEndmatter, parseEndmatter } from "./endmatter";
 
-export {
-  // Zod schemas
-  listIssuesInput,
-  getIssueInput,
-  createIssueInput,
-  listCommentsInput,
-  createCommentInput,
-  // Handler functions
-  handleListIssues,
-  handleGetIssue,
-  handleCreateIssue,
-  handleListComments,
-  handleCreateComment,
-} from "./trpc";
+export { createIssuesRouter } from "./trpc";
