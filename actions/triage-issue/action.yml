@@ -41,7 +41,7 @@ runs:
         fi
 
         echo "Classified as: $TYPE"
-        ./scripts/edit-issue-type.sh "$TYPE" || echo "Warning: could not set issue type"
+        ${{ github.action_path }}/scripts/edit-issue-type.sh "$TYPE" || echo "Warning: could not set issue type"
 
         # ── Priority assignment ────────────────────────────────────
         CRITICAL_KEYWORDS="data loss|security|vulnerability|all users|complete(ly)? (broken|down|unusable)"
@@ -58,7 +58,7 @@ runs:
         fi
 
         echo "Priority: $PRIORITY"
-        ./scripts/edit-issue-labels.sh --add-label "$PRIORITY" || echo "Warning: could not set priority label"
+        ${{ github.action_path }}/scripts/edit-issue-labels.sh --add-label "$PRIORITY" || echo "Warning: could not set priority label"
 
     - name: Check for duplicates
       shell: bash
@@ -84,7 +84,7 @@ runs:
 
         echo "Searching for duplicates: $KEYWORDS"
 
-        RESULTS=$(./scripts/gh.sh search issues "$KEYWORDS" --limit 5 2>/dev/null || true)
+        RESULTS=$(${{ github.action_path }}/scripts/gh.sh search issues "$KEYWORDS" --limit 5 2>/dev/null || true)
 
         # Filter out the current issue from results
         DUPES=$(echo "$RESULTS" \
