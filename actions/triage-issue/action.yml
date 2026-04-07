@@ -1,0 +1,101 @@
+name: Triage Issue
+description: Classify issue type, apply priority label, and flag potential duplicates.
+
+inputs:
+  issue-number:
+    description: Issue number
+    required: true
+  issue-title:
+    description: Issue title
+    required: true
+  issue-body:
+    description: Issue body
+    required: true
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Classify and label
+      shell: bash
+      env:
+        ISSUE_NUMBER: ${{ inputs.issue-number }}
+        ISSUE_TITLE: ${{ inputs.issue-title }}
+        ISSUE_BODY: ${{ inputs.issue-body }}
+      run: |
+        set -euo pipefail
+
+        TITLE_LOWER=$(echo "$ISSUE_TITLE" | tr '[:upper:]' '[:lower:]')
+        BODY_LOWER=$(echo "$ISSUE_BODY" | tr '[:upper:]' '[:lower:]')
+        COMBINED="$TITLE_LOWER $BODY_LOWER"
+
+        # ── Issue type classification ──────────────────────────────
+        BUG_KEYWORDS="bug|broken|break|crash|error|fail|not working|regression|doesn't work|does not work|won't|cannot|can't"
+        FEATURE_KEYWORDS="feature|request|enhancement|add support|would be nice|implement|proposal|suggest"
+
+        TYPE="Task"
+        if echo "$COMBINED" | grep -qiE "$BUG_KEYWORDS"; then
+          TYPE="Bug"
+        elif echo "$COMBINED" | grep -qiE "$FEATURE_KEYWORDS"; then
+          TYPE="Feature"
+        fi
+
+        echo "Classified as: $TYPE"
+        ./scripts/edit-issue-type.sh "$TYPE" || echo "Warning: could not set issue type"
+
+        # ── Priority assignment ────────────────────────────────────
+        CRITICAL_KEYWORDS="data loss|security|vulnerability|all users|complete(ly)? (broken|down|unusable)"
+        HIGH_KEYWORDS="blocker|blocking|severe|major|urgent|cannot use|production"
+        LOW_KEYWORDS="cosmetic|typo|minor|nice to have|nit"
+
+        PRIORITY="priority: medium"
+        if echo "$COMBINED" | grep -qiE "$CRITICAL_KEYWORDS"; then
+          PRIORITY="priority: critical"
+        elif echo "$COMBINED" | grep -qiE "$HIGH_KEYWORDS"; then
+          PRIORITY="priority: high"
+        elif echo "$COMBINED" | grep -qiE "$LOW_KEYWORDS"; then
+          PRIORITY="priority: low"
+        fi
+
+        echo "Priority: $PRIORITY"
+        ./scripts/edit-issue-labels.sh --add-label "$PRIORITY" || echo "Warning: could not set priority label"
+
+    - name: Check for duplicates
+      shell: bash
+      env:
+        ISSUE_NUMBER: ${{ inputs.issue-number }}
+        ISSUE_TITLE: ${{ inputs.issue-title }}
+      run: |
+        set -euo pipefail
+
+        # Extract meaningful keywords from title (drop short/common words)
+        KEYWORDS=$(echo "$ISSUE_TITLE" \
+          | tr '[:upper:]' '[:lower:]' \
+          | tr -cs 'a-z0-9' ' ' \
+          | tr ' ' '\n' \
+          | awk 'length >= 4' \
+          | head -6 \
+          | tr '\n' ' ')
+
+        if [[ -z "$KEYWORDS" ]]; then
+          echo "No meaningful keywords to search for duplicates"
+          exit 0
+        fi
+
+        echo "Searching for duplicates: $KEYWORDS"
+
+        RESULTS=$(./scripts/gh.sh search issues "$KEYWORDS" --limit 5 2>/dev/null || true)
+
+        # Filter out the current issue from results
+        DUPES=$(echo "$RESULTS" \
+          | grep -v "^$" \
+          | grep -v "#${ISSUE_NUMBER}" \
+          | head -3 || true)
+
+        if [[ -n "$DUPES" ]]; then
+          BODY="**Possible duplicates found during auto-triage:**"$'\n\n'"$DUPES"
+          gh issue comment "$ISSUE_NUMBER" --body "$BODY"
+          echo "Flagged potential duplicates"
+        else
+          echo "No duplicates found"
+        fi
