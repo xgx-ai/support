@@ -8,28 +8,15 @@ const GH_BASE_URL = "https://api.github.com";
 /** Owner is always xgx-ai for all consuming projects. */
 const OWNER = "xgx-ai";
 
-let _repoName: string | undefined;
-
-/** Override the target repo name. If not called, falls back to GITHUB_REPO_NAME env var. */
-export function setRepoName(name: string) {
-  _repoName = name;
-}
-
 function getAppConfig() {
   const appId = process.env.GITHUB_APP_ID;
   const installationId = process.env.GITHUB_APP_INSTALLATION_ID;
   const privateKeyBase64 = process.env.GITHUB_APP_PRIVATE_KEY_BASE64;
-  const repo = _repoName ?? process.env.GITHUB_REPO_NAME;
+  const repo = process.env.GITHUB_REPO_NAME;
 
-  if (!appId || !installationId || !privateKeyBase64) {
+  if (!appId || !installationId || !privateKeyBase64 || !repo) {
     throw new Error(
-      "GITHUB_APP_ID, GITHUB_APP_INSTALLATION_ID, and GITHUB_APP_PRIVATE_KEY_BASE64 must be set.",
-    );
-  }
-
-  if (!repo) {
-    throw new Error(
-      "Repo name not set. Call setRepoName() or set GITHUB_REPO_NAME env var.",
+      "GITHUB_APP_ID, GITHUB_APP_INSTALLATION_ID, GITHUB_APP_PRIVATE_KEY_BASE64, and GITHUB_REPO_NAME must be set.",
     );
   }
 

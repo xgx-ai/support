@@ -8,7 +8,6 @@ export {
 } from "./github-app-jwt";
 
 export {
-  setRepoName,
   listIssues,
   getIssue,
   createIssue,
