@@ -1,8 +1,8 @@
 import type {
-  AnyRootTypes,
-  ProcedureBuilder,
-  RouterBuilder,
-  UnsetMarker,
+  AnyTRPCRootTypes,
+  TRPCProcedureBuilder,
+  TRPCRouterBuilder,
+  TRPCUnsetMarker,
 } from "@trpc/server";
 import { z } from "zod";
 import { buildEndmatter } from "./endmatter";
@@ -158,20 +158,20 @@ async function handleCreateComment(
  * `{ user: { name?: string | null } }`.
  */
 export function createIssuesRouter<
-  TRoot extends AnyRootTypes,
+  TRoot extends AnyTRPCRootTypes,
   TContext extends { user: { name?: string | null } },
   TMeta,
   TContextOverrides extends TContext,
 >(
-  router: RouterBuilder<TRoot>,
-  protectedProcedure: ProcedureBuilder<
+  router: TRPCRouterBuilder<TRoot>,
+  protectedProcedure: TRPCProcedureBuilder<
     TContext,
     TMeta,
     TContextOverrides,
-    UnsetMarker,
-    UnsetMarker,
-    UnsetMarker,
-    UnsetMarker,
+    TRPCUnsetMarker,
+    TRPCUnsetMarker,
+    TRPCUnsetMarker,
+    TRPCUnsetMarker,
     false
   >,
 ) {
