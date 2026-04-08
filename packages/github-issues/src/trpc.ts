@@ -91,9 +91,10 @@ async function handleGetIssue(
 async function handleCreateIssue(
   input: z.infer<typeof createIssueInput>,
   author: string,
+  authorId: string,
 ): Promise<Envelope<GHIssue>> {
   try {
-    const meta: Record<string, string> = { author };
+    const meta: Record<string, string> = { author, authorId };
     const body = `**Submitted by ${author}**\n\n${input.body}${buildEndmatter(meta)}`;
     const issue = await createIssue({ title: input.title, body });
     return { data: issue, error: null };
@@ -128,9 +129,10 @@ async function handleListComments(
 async function handleCreateComment(
   input: z.infer<typeof createCommentInput>,
   author: string,
+  authorId: string,
 ): Promise<Envelope<GHComment>> {
   try {
-    const meta: Record<string, string> = { author };
+    const meta: Record<string, string> = { author, authorId };
     const body = `**${author}** wrote:\n\n${input.body}${buildEndmatter(meta)}`;
     const comment = await createComment({
       issueNumber: input.issueNumber,
@@ -155,13 +157,13 @@ async function handleCreateComment(
  * Creates a fully typed tRPC issues router.
  *
  * The `protectedProcedure` context must include
- * `{ user: { name?: string | null } }`.
+ * `{ user: { id: string; name?: string | null } }`.
  */
 export function createIssuesRouter<
   TRoot extends AnyTRPCRootTypes,
   TContext,
   TMeta,
-  TContextOverrides extends { user: { name?: string | null } },
+  TContextOverrides extends { user: { id: string; name?: string | null } },
 >(
   router: TRPCRouterBuilder<TRoot>,
   protectedProcedure: TRPCProcedureBuilder<
@@ -187,7 +189,7 @@ export function createIssuesRouter<
     create: protectedProcedure
       .input(createIssueInput)
       .mutation(({ input, ctx }) =>
-        handleCreateIssue(input, ctx.user.name ?? "Unknown"),
+        handleCreateIssue(input, ctx.user.name ?? "Unknown", ctx.user.id),
       ),
 
     listComments: protectedProcedure
@@ -197,7 +199,7 @@ export function createIssuesRouter<
     createComment: protectedProcedure
       .input(createCommentInput)
       .mutation(({ input, ctx }) =>
-        handleCreateComment(input, ctx.user.name ?? "Unknown"),
+        handleCreateComment(input, ctx.user.name ?? "Unknown", ctx.user.id),
       ),
   });
 }
