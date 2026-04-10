@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "peerDependencies": {
-    "@xgx/ui": "workspace:*",
+    "@xgx/ui": "*",
     "solid-js": ">=1.9.0",
     "@tanstack/solid-query": ">=5.0.0"
   }

@@ -12,7 +12,7 @@
   },
   "peerDependencies": {
     "@trpc/server": ">=11.0.0",
-    "@xgx/ui": "workspace:*",
+    "@xgx/ui": "*",
     "solid-js": ">=1.9.0",
     "@tanstack/solid-query": ">=5.0.0"
   }
