@@ -219,7 +219,9 @@ export function createIssuesRouter<
   >,
   options?: CreateIssuesRouterOptions,
 ) {
-  const baseProcedures = {
+  const bucket = options?.s3Bucket;
+
+  return router({
     list: protectedProcedure
       .input(listIssuesInput)
       .query(({ input }) => handleListIssues(input)),
@@ -243,17 +245,14 @@ export function createIssuesRouter<
       .mutation(({ input, ctx }) =>
         handleCreateComment(input, ctx.user.name ?? "Unknown", ctx.user.id),
       ),
-  };
 
-  if (options?.s3Bucket) {
-    const bucket = options.s3Bucket;
-    return router({
-      ...baseProcedures,
-      uploadImage: protectedProcedure
-        .input(uploadImageInput)
-        .mutation(({ input }) => handleUploadImage(input, bucket)),
-    });
-  }
-
-  return router(baseProcedures);
+    uploadImage: protectedProcedure
+      .input(uploadImageInput)
+      .mutation(({ input }) => {
+        if (!bucket) {
+          return { data: null, error: "Image upload is not configured (no s3Bucket)" } as Envelope<string>;
+        }
+        return handleUploadImage(input, bucket);
+      }),
+  });
 }
