@@ -43,3 +43,13 @@ export {
   ImageAttachButton,
   type ImageAttachButtonProps,
 } from "./components/image-attach-button";
+
+export {
+  IssueDetailPage,
+  type IssueDetailPageProps,
+} from "./components/issue-detail-page";
+
+export {
+  IssuesListPage,
+  type IssuesListPageProps,
+} from "./components/issues-list-page";
