@@ -48,6 +48,15 @@ const createCommentInput = z.object({
   body: z.string().min(1),
 });
 
+const uploadImageInput = z.object({
+  fileName: z.string().min(1),
+  contentType: z.string().min(1),
+  base64: z
+    .string()
+    .min(1)
+    .max(10 * 1024 * 1024),
+});
+
 // ---------------------------------------------------------------------------
 // Handlers (envelope-style return)
 // ---------------------------------------------------------------------------
@@ -150,8 +159,40 @@ async function handleCreateComment(
 }
 
 // ---------------------------------------------------------------------------
+// Image upload handler
+// ---------------------------------------------------------------------------
+
+async function handleUploadImage(
+  input: z.infer<typeof uploadImageInput>,
+  s3Bucket: string,
+): Promise<Envelope<string>> {
+  try {
+    const bytes = Uint8Array.from(atob(input.base64), (c) =>
+      c.charCodeAt(0),
+    );
+    const key = `support-images/${crypto.randomUUID()}/${input.fileName}`;
+
+    await Bun.s3.write(key, bytes, {
+      bucket: s3Bucket,
+      type: input.contentType,
+    });
+
+    const url = `/api/support-images/${key}`;
+    return { data: url, error: null };
+  } catch (error) {
+    console.error("issues.uploadImage failed", error);
+    return { data: null, error: "Failed to upload image" };
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Router factory
 // ---------------------------------------------------------------------------
+
+export interface CreateIssuesRouterOptions {
+  /** S3-compatible bucket name. When provided, enables the `uploadImage` procedure. */
+  s3Bucket?: string;
+}
 
 /**
  * Creates a fully typed tRPC issues router.
@@ -176,8 +217,9 @@ export function createIssuesRouter<
     TRPCUnsetMarker,
     false
   >,
+  options?: CreateIssuesRouterOptions,
 ) {
-  return router({
+  const baseProcedures = {
     list: protectedProcedure
       .input(listIssuesInput)
       .query(({ input }) => handleListIssues(input)),
@@ -201,5 +243,17 @@ export function createIssuesRouter<
       .mutation(({ input, ctx }) =>
         handleCreateComment(input, ctx.user.name ?? "Unknown", ctx.user.id),
       ),
-  });
+  };
+
+  if (options?.s3Bucket) {
+    const bucket = options.s3Bucket;
+    return router({
+      ...baseProcedures,
+      uploadImage: protectedProcedure
+        .input(uploadImageInput)
+        .mutation(({ input }) => handleUploadImage(input, bucket)),
+    });
+  }
+
+  return router(baseProcedures);
 }

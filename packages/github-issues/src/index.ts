@@ -21,4 +21,12 @@ export {
 
 export { buildEndmatter, parseEndmatter } from "./endmatter";
 
-export { createIssuesRouter } from "./trpc";
+export {
+  createIssuesRouter,
+  type CreateIssuesRouterOptions,
+} from "./trpc";
+
+export {
+  handleSupportImageRequest,
+  type SupportImageRequestOptions,
+} from "./s3-proxy";
