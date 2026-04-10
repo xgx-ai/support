@@ -164,22 +164,26 @@ async function handleCreateComment(
 
 async function handleUploadImage(
   input: z.infer<typeof uploadImageInput>,
-  s3Bucket: string,
-  s3PublicUrl: string,
 ): Promise<Envelope<string>> {
   try {
+    const bucket = process.env.S3_BUCKET;
+    const publicUrl = process.env.S3_PUBLIC_URL ?? `${process.env.S3_ENDPOINT}/${bucket}`;
+    if (!bucket || !publicUrl) {
+      return { data: null, error: "Image upload is not configured (S3_BUCKET / S3_PUBLIC_URL env vars missing)" };
+    }
+
     const bytes = Uint8Array.from(atob(input.base64), (c) =>
       c.charCodeAt(0),
     );
     const key = `support-images/${crypto.randomUUID()}/${input.fileName}`;
 
     await Bun.s3.write(key, bytes, {
-      bucket: s3Bucket,
+      bucket,
       type: input.contentType,
       acl: "public-read",
     });
 
-    const url = `${s3PublicUrl}/${key}`;
+    const url = `${publicUrl}/${key}`;
     return { data: url, error: null };
   } catch (error) {
     console.error("issues.uploadImage failed", error);
@@ -191,15 +195,12 @@ async function handleUploadImage(
 // Router factory
 // ---------------------------------------------------------------------------
 
-export interface CreateIssuesRouterOptions {
-  /** S3-compatible bucket name. When provided, enables the `uploadImage` procedure. */
-  s3Bucket?: string;
-  /** Public base URL for the S3 bucket (e.g. `https://s3.example.com/my-bucket`). Required when `s3Bucket` is set. */
-  s3PublicUrl?: string;
-}
-
 /**
  * Creates a fully typed tRPC issues router.
+ *
+ * Image upload reads S3 config from env vars: `S3_BUCKET`, `S3_PUBLIC_URL`
+ * (or `S3_ENDPOINT`). `Bun.s3` reads credentials from `S3_ACCESS_KEY_ID`,
+ * `S3_SECRET_ACCESS_KEY`, `S3_ENDPOINT`, `S3_REGION` automatically.
  *
  * The `protectedProcedure` context must include
  * `{ user: { id: string; name?: string | null } }`.
@@ -221,11 +222,7 @@ export function createIssuesRouter<
     TRPCUnsetMarker,
     false
   >,
-  options?: CreateIssuesRouterOptions,
 ) {
-  const bucket = options?.s3Bucket;
-  const publicUrl = options?.s3PublicUrl;
-
   return router({
     list: protectedProcedure
       .input(listIssuesInput)
@@ -253,11 +250,6 @@ export function createIssuesRouter<
 
     uploadImage: protectedProcedure
       .input(uploadImageInput)
-      .mutation(({ input }) => {
-        if (!bucket || !publicUrl) {
-          return { data: null, error: "Image upload is not configured (no s3Bucket/s3PublicUrl)" } as Envelope<string>;
-        }
-        return handleUploadImage(input, bucket, publicUrl);
-      }),
+      .mutation(({ input }) => handleUploadImage(input)),
   });
 }

@@ -21,7 +21,4 @@ export {
 
 export { buildEndmatter, parseEndmatter } from "./endmatter";
 
-export {
-  createIssuesRouter,
-  type CreateIssuesRouterOptions,
-} from "./trpc";
+export { createIssuesRouter } from "./trpc";
