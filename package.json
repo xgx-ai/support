@@ -7,14 +7,12 @@
     "./github-issues": "./packages/github-issues/src/index.ts",
     "./ui": "./packages/support-ui/src/index.ts"
   },
-  "dependencies": {
-    "zod": "^4.3.6"
-  },
   "peerDependencies": {
     "@trpc/server": ">=11.0.0",
     "@xgx/ui": "*",
     "solid-js": ">=1.9.0",
-    "@tanstack/solid-query": ">=5.0.0"
+    "@tanstack/solid-query": ">=5.0.0",
+    "zod": ">=4.0.0"
   },
   "peerDependenciesMeta": {
     "@xgx/ui": { "optional": true },
