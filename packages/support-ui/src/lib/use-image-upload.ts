@@ -35,11 +35,9 @@ export function useImageUpload(uploadImage: UploadImageFn) {
         base64,
       });
       if (result.error) throw new Error(result.error);
-      if (result.data) {
-        setImages((prev) => [
-          ...prev,
-          { fileName: file.name, url: result.data },
-        ]);
+      const url = result.data;
+      if (url) {
+        setImages((prev) => [...prev, { fileName: file.name, url }]);
       }
     } catch (err) {
       console.error("Image upload failed:", err);
