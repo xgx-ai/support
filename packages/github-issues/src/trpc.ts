@@ -194,7 +194,7 @@ async function handleUploadImage(
 export interface CreateIssuesRouterOptions {
   /** S3-compatible bucket name. When provided, enables the `uploadImage` procedure. */
   s3Bucket?: string;
-  /** Public base URL for the S3 bucket (e.g. `https://fly.storage.tigris.dev/my-bucket`). Required when `s3Bucket` is set. */
+  /** Public base URL for the S3 bucket (e.g. `https://s3.example.com/my-bucket`). Required when `s3Bucket` is set. */
   s3PublicUrl?: string;
 }
 
