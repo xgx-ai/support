@@ -27,12 +27,14 @@ interface Issue {
   state: string;
   created_at: string;
   labels: { name: string; color: string }[];
+  user: { login: string } | null;
 }
 
 interface Comment {
   id: number;
   body: string;
   created_at: string;
+  user: { login: string } | null;
 }
 
 type Envelope<T> = { data: T | null; error: string | null };
