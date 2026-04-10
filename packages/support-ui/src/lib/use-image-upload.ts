@@ -18,7 +18,7 @@ export type UploadImageFn = (input: {
  * Encapsulates: file validation, base64 conversion, upload state,
  * image list management, and markdown body building.
  */
-export function useImageUpload(uploadImage: UploadImageFn, baseURL: string) {
+export function useImageUpload(uploadImage: UploadImageFn) {
   const [images, setImages] = createSignal<UploadedImage[]>([]);
   const [uploading, setUploading] = createSignal(false);
 
@@ -38,7 +38,7 @@ export function useImageUpload(uploadImage: UploadImageFn, baseURL: string) {
       if (result.data) {
         setImages((prev) => [
           ...prev,
-          { fileName: file.name, url: `${baseURL}${result.data}` },
+          { fileName: file.name, url: result.data },
         ]);
       }
     } catch (err) {

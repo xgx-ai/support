@@ -2,18 +2,8 @@ import { For, Show, type JSX } from "solid-js";
 
 const MD_IMAGE_RE = /!\[([^\]]*)\]\(([^)]+)\)/g;
 
-/** Rewrite legacy S3 URLs to backend-proxied paths. */
-const S3_SUPPORT_IMAGE_RE = /^https?:\/\/[^/]+\/[^/]+\/(support-images\/.+)$/;
-
-function rewriteImageUrl(url: string, baseURL: string): string {
-  const match = S3_SUPPORT_IMAGE_RE.exec(url);
-  if (match) return `${baseURL}/api/support-images/${match[1]}`;
-  return url;
-}
-
 export interface MarkdownBodyProps {
   text: string;
-  baseURL: string;
   class?: string;
 }
 
@@ -37,7 +27,7 @@ export function MarkdownBody(props: MarkdownBodyProps): JSX.Element {
       }
       result.push({
         type: "image",
-        value: rewriteImageUrl(match[2]!, props.baseURL),
+        value: match[2]!,
         alt: match[1],
       });
       lastIndex = regex.lastIndex;

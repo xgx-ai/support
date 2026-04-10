@@ -9,7 +9,6 @@ import { ImageAttachmentChips } from "./image-attachment-chips";
 export interface CommentFormProps {
   onSubmit: (body: string) => Promise<{ error: string | null }>;
   uploadImage: UploadImageFn;
-  baseURL: string;
 }
 
 /**
@@ -28,7 +27,7 @@ export function CommentForm(props: CommentFormProps) {
     removeImage,
     reset,
     buildBodyWithImages,
-  } = useImageUpload(props.uploadImage, props.baseURL);
+  } = useImageUpload(props.uploadImage);
 
   const handleSubmit = async () => {
     const body = buildBodyWithImages(commentBody().trim());

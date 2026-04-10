@@ -165,6 +165,7 @@ async function handleCreateComment(
 async function handleUploadImage(
   input: z.infer<typeof uploadImageInput>,
   s3Bucket: string,
+  s3PublicUrl: string,
 ): Promise<Envelope<string>> {
   try {
     const bytes = Uint8Array.from(atob(input.base64), (c) =>
@@ -175,9 +176,10 @@ async function handleUploadImage(
     await Bun.s3.write(key, bytes, {
       bucket: s3Bucket,
       type: input.contentType,
+      acl: "public-read",
     });
 
-    const url = `/api/support-images/${key}`;
+    const url = `${s3PublicUrl}/${key}`;
     return { data: url, error: null };
   } catch (error) {
     console.error("issues.uploadImage failed", error);
@@ -192,6 +194,8 @@ async function handleUploadImage(
 export interface CreateIssuesRouterOptions {
   /** S3-compatible bucket name. When provided, enables the `uploadImage` procedure. */
   s3Bucket?: string;
+  /** Public base URL for the S3 bucket (e.g. `https://fly.storage.tigris.dev/my-bucket`). Required when `s3Bucket` is set. */
+  s3PublicUrl?: string;
 }
 
 /**
@@ -220,6 +224,7 @@ export function createIssuesRouter<
   options?: CreateIssuesRouterOptions,
 ) {
   const bucket = options?.s3Bucket;
+  const publicUrl = options?.s3PublicUrl;
 
   return router({
     list: protectedProcedure
@@ -249,10 +254,10 @@ export function createIssuesRouter<
     uploadImage: protectedProcedure
       .input(uploadImageInput)
       .mutation(({ input }) => {
-        if (!bucket) {
-          return { data: null, error: "Image upload is not configured (no s3Bucket)" } as Envelope<string>;
+        if (!bucket || !publicUrl) {
+          return { data: null, error: "Image upload is not configured (no s3Bucket/s3PublicUrl)" } as Envelope<string>;
         }
-        return handleUploadImage(input, bucket);
+        return handleUploadImage(input, bucket, publicUrl);
       }),
   });
 }

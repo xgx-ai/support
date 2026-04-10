@@ -24,7 +24,6 @@ export type CreateIssueFn = (input: {
 export interface CreateIssueDialogProps extends DialogContentProps<boolean> {
   uploadImage: UploadImageFn;
   createIssue: CreateIssueFn;
-  baseURL: string;
   /**
    * Optional hook to transform the title/body before the create mutation fires.
    * Use this for app-specific additions (e.g. appending a PostHog session replay URL).
@@ -46,7 +45,7 @@ export function CreateIssueDialog(props: CreateIssueDialogProps) {
     handlePaste,
     removeImage,
     buildBodyWithImages,
-  } = useImageUpload(props.uploadImage, props.baseURL);
+  } = useImageUpload(props.uploadImage);
 
   const createMutation = useMutation(() => ({
     mutationFn: async (params: { title: string; body: string }) => {
