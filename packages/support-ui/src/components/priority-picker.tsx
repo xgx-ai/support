@@ -1,11 +1,11 @@
 import { Badge, Flex, Text } from "@xgx/ui";
 import { For } from "solid-js";
-import type { PriorityLevel } from "../lib/priority";
+import type { PriorityLabel, PriorityLevel } from "../lib/priority";
 
 export interface PriorityOption {
 	label: string;
 	level: PriorityLevel;
-	value: string;
+	value: PriorityLabel;
 	color: string;
 }
 
@@ -17,9 +17,9 @@ const PRIORITY_OPTIONS: PriorityOption[] = [
 
 export interface PriorityPickerProps {
 	/** Currently selected priority label (e.g. "p1", "p2", "p3"). `undefined` means none selected. */
-	value: string | undefined;
+	value: PriorityLabel | undefined;
 	/** Called when the user picks a priority. */
-	onChange: (value: string) => void;
+	onChange: (value: PriorityLabel) => void;
 	/** Optional label above the picker. */
 	label?: string;
 	/** If true, render compact inline badges (for detail page). */

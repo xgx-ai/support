@@ -16,6 +16,7 @@ import {
 import { ArrowLeft } from "@xgx/ui/icons";
 import { For, type JSX, Show } from "solid-js";
 import { parseCommentAuthor, parseIssueBody } from "../lib/parse-endmatter";
+import type { PriorityLabel } from "../lib/priority";
 import { filterNonPriorityLabels, getPriority } from "../lib/priority";
 import type { UploadImageFn } from "../lib/use-image-upload";
 import { CommentForm } from "./comment-form";
@@ -63,7 +64,7 @@ export interface IssueDetailPageProps {
 	/** Update the priority of an issue. */
 	setPriority?: (input: {
 		issueNumber: number;
-		priority: string;
+		priority: PriorityLabel;
 	}) => Promise<Envelope<unknown>>;
 	/** Upload an image (for the comment form). */
 	uploadImage: UploadImageFn;
@@ -111,7 +112,7 @@ export function IssueDetailPage(props: IssueDetailPageProps) {
 	const comments = () => commentsQuery.data?.data ?? [];
 
 	const priorityMutation = createMutation(() => ({
-		mutationFn: async (priority: string) => {
+		mutationFn: async (priority: PriorityLabel) => {
 			if (!props.setPriority) return;
 			const result = await props.setPriority({
 				issueNumber: props.issueNumber,

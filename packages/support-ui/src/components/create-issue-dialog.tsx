@@ -11,6 +11,7 @@ import {
 	TextFieldTextArea,
 } from "@xgx/ui";
 import { createSignal, Show } from "solid-js";
+import type { PriorityLabel } from "../lib/priority";
 import type { UploadImageFn } from "../lib/use-image-upload";
 import { useImageUpload } from "../lib/use-image-upload";
 import { ImageAttachButton } from "./image-attach-button";
@@ -20,7 +21,7 @@ import { PriorityPicker } from "./priority-picker";
 export type CreateIssueFn = (input: {
 	title: string;
 	body: string;
-	priority?: string;
+	priority?: PriorityLabel;
 }) => Promise<{ data: unknown; error: string | null }>;
 
 export interface CreateIssueDialogProps extends DialogContentProps<boolean> {
@@ -39,7 +40,9 @@ export interface CreateIssueDialogProps extends DialogContentProps<boolean> {
 export function CreateIssueDialog(props: CreateIssueDialogProps) {
 	const [title, setTitle] = createSignal("");
 	const [body, setBody] = createSignal("");
-	const [priority, setPriority] = createSignal<string | undefined>(undefined);
+	const [priority, setPriority] = createSignal<PriorityLabel | undefined>(
+		undefined,
+	);
 
 	const {
 		images,
@@ -54,7 +57,7 @@ export function CreateIssueDialog(props: CreateIssueDialogProps) {
 		mutationFn: async (params: {
 			title: string;
 			body: string;
-			priority?: string;
+			priority?: PriorityLabel;
 		}) => {
 			const transformed = props.onBeforeCreate
 				? { ...params, ...props.onBeforeCreate(params) }

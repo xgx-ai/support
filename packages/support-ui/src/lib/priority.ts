@@ -10,6 +10,7 @@
  */
 
 export type PriorityLevel = "high" | "medium" | "low";
+export type PriorityLabel = "p1" | "p2" | "p3";
 
 /** Label names that represent a priority. */
 const PRIORITY_LABELS: Record<string, PriorityLevel> = {
@@ -19,7 +20,7 @@ const PRIORITY_LABELS: Record<string, PriorityLevel> = {
 };
 
 /** Map from level back to the label name. */
-const LEVEL_TO_LABEL: Record<PriorityLevel, string> = {
+const LEVEL_TO_LABEL: Record<PriorityLevel, PriorityLabel> = {
 	high: "p1",
 	medium: "p2",
 	low: "p3",
@@ -48,7 +49,7 @@ const BADGE_COLORS: Record<PriorityLevel, string> = {
 export interface Priority {
 	level: PriorityLevel;
 	/** The GitHub label name (e.g. "p1", "p2", "p3"). */
-	label: string;
+	label: PriorityLabel;
 	displayText: string;
 	color: string;
 }

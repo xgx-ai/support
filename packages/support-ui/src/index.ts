@@ -48,6 +48,7 @@ export {
 	getPriority,
 	PRIORITY_LABEL_NAMES,
 	type Priority,
+	type PriorityLabel,
 	type PriorityLevel,
 } from "./lib/priority";
 export {
