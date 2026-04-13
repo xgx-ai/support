@@ -183,7 +183,7 @@ async function handleUploadImage(
       acl: "public-read",
     });
 
-    const url = `${publicUrl}/${key}`;
+    const url = encodeURI(`${publicUrl}/${key}`);
     return { data: url, error: null };
   } catch (error) {
     console.error("issues.uploadImage failed", error);
