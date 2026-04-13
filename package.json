@@ -3,9 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "workspaces": ["packages/*", "actions/*"],
   "exports": {
     "./github-issues": "./packages/github-issues/src/index.ts",
     "./ui": "./packages/support-ui/src/index.ts"
+  },
+  "devDependencies": {
+    "typescript": ">=5.7.2"
   },
   "peerDependencies": {
     "@trpc/server": ">=11.0.0",
