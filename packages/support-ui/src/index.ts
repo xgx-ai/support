@@ -1,63 +1,53 @@
 // Support UI package
 // Shared SolidJS components and helpers for the support/ticketing system.
 
-// --- Lib ---
 export {
-  parseEndmatter,
-  stripPrefix,
-  parseCommentAuthor,
-  parseIssueBody,
-} from "./lib/parse-endmatter";
-
-export { fileToBase64 } from "./lib/file-to-base64";
-
+	CommentForm,
+	type CommentFormProps,
+} from "./components/comment-form";
 export {
-  useImageUpload,
-  type UploadedImage,
-  type UploadImageFn,
-} from "./lib/use-image-upload";
-
+	CreateIssueDialog,
+	type CreateIssueDialogProps,
+	type CreateIssueFn,
+} from "./components/create-issue-dialog";
 export {
-  getPriority,
-  filterNonPriorityLabels,
-  PRIORITY_LABEL_NAMES,
-  type PriorityLevel,
-  type Priority,
-} from "./lib/priority";
-
+	ImageAttachButton,
+	type ImageAttachButtonProps,
+} from "./components/image-attach-button";
+export {
+	ImageAttachmentChips,
+	type ImageAttachmentChipsProps,
+} from "./components/image-attachment-chips";
+export {
+	IssueDetailPage,
+	type IssueDetailPageProps,
+} from "./components/issue-detail-page";
+export {
+	IssuesListPage,
+	type IssuesListPageProps,
+} from "./components/issues-list-page";
 // --- Components ---
 export {
-  MarkdownBody,
-  type MarkdownBodyProps,
+	MarkdownBody,
+	type MarkdownBodyProps,
 } from "./components/markdown-body";
-
+export { fileToBase64 } from "./lib/file-to-base64";
+// --- Lib ---
 export {
-  CreateIssueDialog,
-  type CreateIssueDialogProps,
-  type CreateIssueFn,
-} from "./components/create-issue-dialog";
-
+	parseCommentAuthor,
+	parseEndmatter,
+	parseIssueBody,
+	stripPrefix,
+} from "./lib/parse-endmatter";
 export {
-  CommentForm,
-  type CommentFormProps,
-} from "./components/comment-form";
-
+	filterNonPriorityLabels,
+	getPriority,
+	PRIORITY_LABEL_NAMES,
+	type Priority,
+	type PriorityLevel,
+} from "./lib/priority";
 export {
-  ImageAttachmentChips,
-  type ImageAttachmentChipsProps,
-} from "./components/image-attachment-chips";
-
-export {
-  ImageAttachButton,
-  type ImageAttachButtonProps,
-} from "./components/image-attach-button";
-
-export {
-  IssueDetailPage,
-  type IssueDetailPageProps,
-} from "./components/issue-detail-page";
-
-export {
-  IssuesListPage,
-  type IssuesListPageProps,
-} from "./components/issues-list-page";
+	type UploadedImage,
+	type UploadImageFn,
+	useImageUpload,
+} from "./lib/use-image-upload";

@@ -13,9 +13,9 @@ export type PriorityLevel = "high" | "medium" | "low";
 
 /** Label names that represent a priority. */
 const PRIORITY_LABELS: Record<string, PriorityLevel> = {
-  p1: "high",
-  p2: "medium",
-  p3: "low",
+	p1: "high",
+	p2: "medium",
+	p3: "low",
 };
 
 /** All recognised priority label names. */
@@ -23,9 +23,9 @@ export const PRIORITY_LABEL_NAMES = new Set(Object.keys(PRIORITY_LABELS));
 
 /** Human-readable display text for each level. */
 const DISPLAY_TEXT: Record<PriorityLevel, string> = {
-  high: "High",
-  medium: "Medium",
-  low: "Low",
+	high: "High",
+	medium: "Medium",
+	low: "Low",
 };
 
 /**
@@ -33,15 +33,15 @@ const DISPLAY_TEXT: Record<PriorityLevel, string> = {
  * These pair well with the `Badge` component's `variant="outline"` style.
  */
 const BADGE_COLORS: Record<PriorityLevel, string> = {
-  high: "#e53e3e",   // red
-  medium: "#dd6b20", // orange
-  low: "#718096",    // gray
+	high: "#e53e3e", // red
+	medium: "#dd6b20", // orange
+	low: "#718096", // gray
 };
 
 export interface Priority {
-  level: PriorityLevel;
-  displayText: string;
-  color: string;
+	level: PriorityLevel;
+	displayText: string;
+	color: string;
 }
 
 /**
@@ -49,27 +49,25 @@ export interface Priority {
  * The *highest* priority label wins if multiple exist.
  * Returns `low` when no priority label is present.
  */
-export function getPriority(
-  labels: { name: string }[],
-): Priority {
-  let level: PriorityLevel = "low";
+export function getPriority(labels: { name: string }[]): Priority {
+	let level: PriorityLevel = "low";
 
-  for (const label of labels) {
-    const mapped = PRIORITY_LABELS[label.name.toLowerCase()];
-    if (mapped === "high") {
-      level = "high";
-      break; // can't go higher
-    }
-    if (mapped === "medium" && level !== "high") {
-      level = "medium";
-    }
-  }
+	for (const label of labels) {
+		const mapped = PRIORITY_LABELS[label.name.toLowerCase()];
+		if (mapped === "high") {
+			level = "high";
+			break; // can't go higher
+		}
+		if (mapped === "medium" && level === "low") {
+			level = "medium";
+		}
+	}
 
-  return {
-    level,
-    displayText: DISPLAY_TEXT[level],
-    color: BADGE_COLORS[level],
-  };
+	return {
+		level,
+		displayText: DISPLAY_TEXT[level],
+		color: BADGE_COLORS[level],
+	};
 }
 
 /**
@@ -77,7 +75,7 @@ export function getPriority(
  * so they can be displayed in the generic "Labels" column/section.
  */
 export function filterNonPriorityLabels<T extends { name: string }>(
-  labels: T[],
+	labels: T[],
 ): T[] {
-  return labels.filter((l) => !PRIORITY_LABEL_NAMES.has(l.name.toLowerCase()));
+	return labels.filter((l) => !PRIORITY_LABEL_NAMES.has(l.name.toLowerCase()));
 }
