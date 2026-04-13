@@ -5,6 +5,7 @@
 export { buildEndmatter, parseEndmatter } from "./endmatter";
 
 export {
+	addLabels,
 	createComment,
 	createIssue,
 	type GHComment,
@@ -14,6 +15,7 @@ export {
 	getIssue,
 	listComments,
 	listIssues,
+	setLabels,
 } from "./github-api-client";
 export {
 	createGitHubAppJwt,

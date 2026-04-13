@@ -31,6 +31,10 @@ export {
 	MarkdownBody,
 	type MarkdownBodyProps,
 } from "./components/markdown-body";
+export {
+	PriorityPicker,
+	type PriorityPickerProps,
+} from "./components/priority-picker";
 export { fileToBase64 } from "./lib/file-to-base64";
 // --- Lib ---
 export {

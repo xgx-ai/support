@@ -1,4 +1,8 @@
-import { createQuery, useQueryClient } from "@tanstack/solid-query";
+import {
+	createMutation,
+	createQuery,
+	useQueryClient,
+} from "@tanstack/solid-query";
 import {
 	Badge,
 	Box,
@@ -16,6 +20,7 @@ import { filterNonPriorityLabels, getPriority } from "../lib/priority";
 import type { UploadImageFn } from "../lib/use-image-upload";
 import { CommentForm } from "./comment-form";
 import { MarkdownBody } from "./markdown-body";
+import { PriorityPicker } from "./priority-picker";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -55,6 +60,11 @@ export interface IssueDetailPageProps {
 		issueNumber: number;
 		body: string;
 	}) => Promise<Envelope<Comment>>;
+	/** Update the priority of an issue. */
+	setPriority?: (input: {
+		issueNumber: number;
+		priority: string;
+	}) => Promise<Envelope<unknown>>;
 	/** Upload an image (for the comment form). */
 	uploadImage: UploadImageFn;
 
@@ -99,6 +109,23 @@ export function IssueDetailPage(props: IssueDetailPageProps) {
 
 	const issue = () => issueQuery.data?.data;
 	const comments = () => commentsQuery.data?.data ?? [];
+
+	const priorityMutation = createMutation(() => ({
+		mutationFn: async (priority: string) => {
+			if (!props.setPriority) return;
+			const result = await props.setPriority({
+				issueNumber: props.issueNumber,
+				priority,
+			});
+			if (result.error) throw new Error(result.error);
+			return result;
+		},
+		onSuccess: () => {
+			queryClient.invalidateQueries({
+				queryKey: props.queryKeys.detail(props.issueNumber),
+			});
+		},
+	}));
 
 	const handleSubmitComment = async (body: string) => {
 		const result = await props.createComment({
@@ -148,13 +175,27 @@ export function IssueDetailPage(props: IssueDetailPageProps) {
 											{(() => {
 												const p = getPriority(i().labels);
 												return (
-													<Badge
-														variant="outline"
-														class="font-normal"
-														style={{ "border-color": p.color, color: p.color }}
+													<Show
+														when={props.setPriority}
+														fallback={
+															<Badge
+																variant="outline"
+																class="font-normal"
+																style={{
+																	"border-color": p.color,
+																	color: p.color,
+																}}
+															>
+																{p.displayText} Priority
+															</Badge>
+														}
 													>
-														{p.displayText} Priority
-													</Badge>
+														<PriorityPicker
+															value={p.label}
+															onChange={(v) => priorityMutation.mutate(v)}
+															disabled={priorityMutation.isPending}
+														/>
+													</Show>
 												);
 											})()}
 											<Text size="xs" class="text-muted-foreground">

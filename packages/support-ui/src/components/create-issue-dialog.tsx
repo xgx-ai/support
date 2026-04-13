@@ -15,10 +15,12 @@ import type { UploadImageFn } from "../lib/use-image-upload";
 import { useImageUpload } from "../lib/use-image-upload";
 import { ImageAttachButton } from "./image-attach-button";
 import { ImageAttachmentChips } from "./image-attachment-chips";
+import { PriorityPicker } from "./priority-picker";
 
 export type CreateIssueFn = (input: {
 	title: string;
 	body: string;
+	priority?: string;
 }) => Promise<{ data: unknown; error: string | null }>;
 
 export interface CreateIssueDialogProps extends DialogContentProps<boolean> {
@@ -37,6 +39,7 @@ export interface CreateIssueDialogProps extends DialogContentProps<boolean> {
 export function CreateIssueDialog(props: CreateIssueDialogProps) {
 	const [title, setTitle] = createSignal("");
 	const [body, setBody] = createSignal("");
+	const [priority, setPriority] = createSignal<string | undefined>(undefined);
 
 	const {
 		images,
@@ -48,9 +51,13 @@ export function CreateIssueDialog(props: CreateIssueDialogProps) {
 	} = useImageUpload(props.uploadImage);
 
 	const createMutation = useMutation(() => ({
-		mutationFn: async (params: { title: string; body: string }) => {
+		mutationFn: async (params: {
+			title: string;
+			body: string;
+			priority?: string;
+		}) => {
 			const transformed = props.onBeforeCreate
-				? props.onBeforeCreate(params)
+				? { ...params, ...props.onBeforeCreate(params) }
 				: params;
 			const result = await props.createIssue(transformed);
 			if (result.error) throw new Error(result.error);
@@ -64,7 +71,11 @@ export function CreateIssueDialog(props: CreateIssueDialogProps) {
 	const handleSubmit = (e: SubmitEvent) => {
 		e.preventDefault();
 		const fullBody = buildBodyWithImages(body().trim());
-		createMutation.mutate({ title: title(), body: fullBody });
+		createMutation.mutate({
+			title: title(),
+			body: fullBody,
+			priority: priority(),
+		});
 	};
 
 	return (
@@ -86,6 +97,12 @@ export function CreateIssueDialog(props: CreateIssueDialogProps) {
 						onPaste={handlePaste}
 					/>
 				</TextField>
+
+				<PriorityPicker
+					value={priority()}
+					onChange={setPriority}
+					label="Priority"
+				/>
 
 				{/* Image attachments */}
 				<ImageAttachmentChips images={images()} onRemove={removeImage} />

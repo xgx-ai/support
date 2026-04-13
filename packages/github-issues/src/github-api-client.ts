@@ -194,3 +194,39 @@ export async function createComment(params: {
 		},
 	);
 }
+
+/**
+ * Replace the entire label set on an issue.
+ * Accepts an array of label names. GitHub will create labels that don't exist
+ * yet in the repo.
+ */
+export async function setLabels(params: {
+	issueNumber: number;
+	labels: string[];
+}): Promise<GHLabel[]> {
+	const { owner, repo } = getRepo();
+	return ghFetch<GHLabel[]>(
+		`/repos/${owner}/${repo}/issues/${params.issueNumber}/labels`,
+		{
+			method: "PUT",
+			body: JSON.stringify({ labels: params.labels }),
+		},
+	);
+}
+
+/**
+ * Add labels to an issue (without removing existing ones).
+ */
+export async function addLabels(params: {
+	issueNumber: number;
+	labels: string[];
+}): Promise<GHLabel[]> {
+	const { owner, repo } = getRepo();
+	return ghFetch<GHLabel[]>(
+		`/repos/${owner}/${repo}/issues/${params.issueNumber}/labels`,
+		{
+			method: "POST",
+			body: JSON.stringify({ labels: params.labels }),
+		},
+	);
+}

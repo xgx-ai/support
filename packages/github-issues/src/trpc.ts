@@ -7,13 +7,16 @@ import type {
 import { z } from "zod";
 import { buildEndmatter } from "./endmatter";
 import {
+	addLabels,
 	createComment,
 	createIssue,
 	type GHComment,
 	type GHIssue,
+	type GHLabel,
 	getIssue,
 	listComments,
 	listIssues,
+	setLabels,
 } from "./github-api-client";
 
 // ---------------------------------------------------------------------------
@@ -32,9 +35,12 @@ const getIssueInput = z.object({
 	issueNumber: z.number().int().positive(),
 });
 
+const priorityInput = z.enum(["p1", "p2", "p3"]);
+
 const createIssueInput = z.object({
 	title: z.string().min(1).max(256),
 	body: z.string().min(1),
+	priority: priorityInput.optional(),
 });
 
 const listCommentsInput = z.object({
@@ -46,6 +52,11 @@ const listCommentsInput = z.object({
 const createCommentInput = z.object({
 	issueNumber: z.number().int().positive(),
 	body: z.string().min(1),
+});
+
+const setPriorityInput = z.object({
+	issueNumber: z.number().int().positive(),
+	priority: priorityInput,
 });
 
 const uploadImageInput = z.object({
@@ -106,6 +117,18 @@ async function handleCreateIssue(
 		const meta: Record<string, string> = { author, authorId };
 		const body = `**Submitted by ${author}**\n\n${input.body}${buildEndmatter(meta)}`;
 		const issue = await createIssue({ title: input.title, body });
+
+		// Apply priority label if specified
+		if (input.priority) {
+			await addLabels({
+				issueNumber: issue.number,
+				labels: [input.priority],
+			});
+			// Refresh to get updated labels
+			const updated = await getIssue(issue.number);
+			return { data: updated, error: null };
+		}
+
 		return { data: issue, error: null };
 	} catch (error) {
 		console.error("Error creating issue:", error);
@@ -153,6 +176,38 @@ async function handleCreateComment(
 			data: null,
 			error:
 				error instanceof Error ? error.message : "Failed to create comment",
+		};
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Set priority handler
+// ---------------------------------------------------------------------------
+
+/** Priority label names we manage. */
+const PRIORITY_LABEL_SET = new Set(["p1", "p2", "p3"]);
+
+async function handleSetPriority(
+	input: z.infer<typeof setPriorityInput>,
+): Promise<Envelope<GHLabel[]>> {
+	try {
+		// Get current labels, strip any existing priority labels, add the new one.
+		const issue = await getIssue(input.issueNumber);
+		const kept = issue.labels
+			.map((l) => l.name)
+			.filter((n) => !PRIORITY_LABEL_SET.has(n.toLowerCase()));
+		kept.push(input.priority);
+
+		const labels = await setLabels({
+			issueNumber: input.issueNumber,
+			labels: kept,
+		});
+		return { data: labels, error: null };
+	} catch (error) {
+		console.error("Error setting priority:", error);
+		return {
+			data: null,
+			error: error instanceof Error ? error.message : "Failed to set priority",
 		};
 	}
 }
@@ -249,6 +304,10 @@ export function createIssuesRouter<
 			.mutation(({ input, ctx }) =>
 				handleCreateComment(input, ctx.user.name ?? "Unknown", ctx.user.id),
 			),
+
+		setPriority: protectedProcedure
+			.input(setPriorityInput)
+			.mutation(({ input }) => handleSetPriority(input)),
 
 		uploadImage: protectedProcedure
 			.input(uploadImageInput)
