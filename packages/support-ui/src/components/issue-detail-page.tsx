@@ -14,6 +14,7 @@ import { For, Show, type JSX } from "solid-js";
 import { CommentForm } from "./comment-form";
 import { MarkdownBody } from "./markdown-body";
 import { parseCommentAuthor, parseIssueBody } from "../lib/parse-endmatter";
+import { filterNonPriorityLabels, getPriority } from "../lib/priority";
 import type { UploadImageFn } from "../lib/use-image-upload";
 
 // ---------------------------------------------------------------------------
@@ -144,6 +145,18 @@ export function IssueDetailPage(props: IssueDetailPageProps) {
                       >
                         {i().state}
                       </Badge>
+                      {(() => {
+                        const p = getPriority(i().labels);
+                        return (
+                          <Badge
+                            variant="outline"
+                            class="font-normal"
+                            style={{ "border-color": p.color, color: p.color }}
+                          >
+                            {p.displayText} Priority
+                          </Badge>
+                        );
+                      })()}
                       <Text size="xs" class="text-muted-foreground">
                         #{i().number}
                       </Text>
@@ -166,9 +179,9 @@ export function IssueDetailPage(props: IssueDetailPageProps) {
                         )}
                       </Show>
                     </Flex>
-                    <Show when={i().labels.length > 0}>
+                    <Show when={filterNonPriorityLabels(i().labels).length > 0}>
                       <Flex gap="1.5" class="flex-wrap pt-1">
-                        <For each={i().labels}>
+                        <For each={filterNonPriorityLabels(i().labels)}>
                           {(label) => (
                             <Badge
                               variant="outline"

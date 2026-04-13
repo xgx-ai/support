@@ -17,6 +17,7 @@ import {
 } from "@xgx/ui";
 import { MessageSquare, Plus } from "@xgx/ui/icons";
 import { createSignal, onCleanup, Show, Suspense, type JSX } from "solid-js";
+import { filterNonPriorityLabels, getPriority } from "../lib/priority";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -134,11 +135,30 @@ export function IssuesListPage(props: IssuesListPageProps) {
       enableSorting: true,
     },
     {
+      id: "priority",
+      meta: { displayName: "Priority" },
+      header: () => <TableColumnHeader title="Priority" />,
+      cell: (info) => {
+        const priority = getPriority(info.row.original.labels);
+        return (
+          <Badge
+            variant="outline"
+            class="font-normal text-xxs"
+            style={{ "border-color": priority.color, color: priority.color }}
+          >
+            {priority.displayText}
+          </Badge>
+        );
+      },
+      enableSorting: false,
+      size: 100,
+    },
+    {
       id: "labels",
       meta: { displayName: "Labels" },
       header: () => <TableColumnHeader title="Labels" />,
       cell: (info) => {
-        const labels = info.row.original.labels;
+        const labels = filterNonPriorityLabels(info.row.original.labels);
         return (
           <Show
             when={labels.length > 0}

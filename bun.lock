@@ -1,0 +1,26 @@
+{
+  "lockfileVersion": 1,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "@xgx-ai/support",
+      "peerDependencies": {
+        "@tanstack/solid-query": ">=5.0.0",
+        "@trpc/server": ">=11.0.0",
+        "@xgx/ui": "*",
+        "solid-js": ">=1.9.0",
+        "zod": ">=4.0.0",
+      },
+      "optionalPeers": [
+        "@tanstack/solid-query",
+        "@xgx/ui",
+        "solid-js",
+      ],
+    },
+  },
+  "packages": {
+    "@trpc/server": ["@trpc/server@11.16.0", "", { "peerDependencies": { "typescript": ">=5.7.2" }, "bin": { "intent": "bin/intent.js" } }, "sha512-XgGuUMddrUTd04+za/WE5GFuZ1/YU9XQG0t3VL5WOIu2JspkOlq6k4RYEiqS6HSJt+S0RXaPdIoE2anIP/BBRQ=="],
+
+    "zod": ["zod@4.3.6", "", {}, "sha512-rftlrkhHZOcjDwkGlnUtZZkvaPHCsDATp4pGpuOOMDaTdDDXF91wuVDJoWoPsKX/3YPQ5fHuF3STjcYyKr+Qhg=="],
+  }
+}

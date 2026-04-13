@@ -17,6 +17,14 @@ export {
   type UploadImageFn,
 } from "./lib/use-image-upload";
 
+export {
+  getPriority,
+  filterNonPriorityLabels,
+  PRIORITY_LABEL_NAMES,
+  type PriorityLevel,
+  type Priority,
+} from "./lib/priority";
+
 // --- Components ---
 export {
   MarkdownBody,
