@@ -1,0 +1,22 @@
+name: Triage Issue
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  issues: write
+
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./actions/triage-issue
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          issue-title: ${{ github.event.issue.title }}
+          issue-body: ${{ github.event.issue.body }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
