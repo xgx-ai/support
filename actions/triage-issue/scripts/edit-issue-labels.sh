@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
 #
 # Edits labels on a GitHub issue.
-# Usage: ./scripts/edit-issue-labels.sh --add-label bug --add-label "priority: high" --remove-label untriaged
+# Usage: ISSUE_NUMBER=123 ./scripts/edit-issue-labels.sh --add-label bug --add-label p1 --remove-label untriaged
 #
-# The issue number is read from the workflow event payload.
+# Requires ISSUE_NUMBER env var.
 
 set -euo pipefail
 
-ISSUE=$(jq -r '.issue.number // empty' "${GITHUB_EVENT_PATH:?GITHUB_EVENT_PATH not set}")
-if ! [[ "$ISSUE" =~ ^[0-9]+$ ]]; then
-  echo "Error: no issue number in event payload" >&2
+if ! [[ "${ISSUE_NUMBER:-}" =~ ^[0-9]+$ ]]; then
+  echo "Error: ISSUE_NUMBER env var must be a positive integer" >&2
   exit 1
 fi
+ISSUE="$ISSUE_NUMBER"
 
 ADD_LABELS=()
 REMOVE_LABELS=()

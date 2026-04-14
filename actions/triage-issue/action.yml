@@ -48,13 +48,13 @@ runs:
         HIGH_KEYWORDS="blocker|blocking|severe|major|urgent|cannot use|production"
         LOW_KEYWORDS="cosmetic|typo|minor|nice to have|nit"
 
-        PRIORITY="priority: medium"
+        PRIORITY="p2"
         if echo "$COMBINED" | grep -qiE "$CRITICAL_KEYWORDS"; then
-          PRIORITY="priority: critical"
+          PRIORITY="p0"
         elif echo "$COMBINED" | grep -qiE "$HIGH_KEYWORDS"; then
-          PRIORITY="priority: high"
+          PRIORITY="p1"
         elif echo "$COMBINED" | grep -qiE "$LOW_KEYWORDS"; then
-          PRIORITY="priority: low"
+          PRIORITY="p3"
         fi
 
         echo "Priority: $PRIORITY"

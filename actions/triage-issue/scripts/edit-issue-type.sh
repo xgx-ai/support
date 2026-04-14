@@ -1,11 +1,9 @@
 #!/usr/bin/env bash
 #
 # Sets the issue type on a GitHub issue via GraphQL.
-# Usage: ./scripts/edit-issue-type.sh Bug
-#        ./scripts/edit-issue-type.sh Feature
-#        ./scripts/edit-issue-type.sh Task
+# Usage: ISSUE_NUMBER=123 ./scripts/edit-issue-type.sh Bug
 #
-# The issue number is read from the workflow event payload.
+# Requires ISSUE_NUMBER and GITHUB_REPOSITORY env vars.
 
 set -euo pipefail
 
@@ -15,9 +13,8 @@ if [[ -z "$TYPE_NAME" ]]; then
   exit 1
 fi
 
-ISSUE_NUMBER=$(jq -r '.issue.number // empty' "${GITHUB_EVENT_PATH:?GITHUB_EVENT_PATH not set}")
-if ! [[ "$ISSUE_NUMBER" =~ ^[0-9]+$ ]]; then
-  echo "Error: no issue number in event payload" >&2
+if ! [[ "${ISSUE_NUMBER:-}" =~ ^[0-9]+$ ]]; then
+  echo "Error: ISSUE_NUMBER env var must be a positive integer" >&2
   exit 1
 fi
 
