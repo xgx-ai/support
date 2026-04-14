@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+
+      - uses: oven-sh/setup-bun@v2
+
+      - uses: biomejs/setup-biome@v2
+        with:
+          version: 2.4.10
+
+      - run: bun install --frozen-lockfile
+
+      - name: Autofix lint and formatting
+        run: biome check --write .
+
+      - name: Commit fixes
+        run: |
+          git diff --quiet && exit 0
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "ci: autofix lint and formatting"
+          git push
+
+      - name: Check
+        run: |
+          biome check .
+          bun x tsgo -p packages/github-issues/tsconfig.json
+          bun x tsgo -p packages/support-ui/tsconfig.json
