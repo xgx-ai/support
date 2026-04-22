@@ -38,7 +38,11 @@ type IssueState = "open" | "closed";
 
 export interface IssuesListPageProps {
 	/** Fetch issues list. */
-	listIssues: (input: { state: IssueState }) => Promise<Envelope<Issue[]>>;
+	listIssues: (input: {
+		state: IssueState;
+		page: number;
+		perPage: number;
+	}) => Promise<Envelope<Issue[]>>;
 
 	/** Navigate to an issue detail page. */
 	onNavigateToIssue: (issueNumber: number) => void;
@@ -225,11 +229,17 @@ export function IssuesListPage(props: IssuesListPageProps) {
 		},
 	];
 
+	const PAGE_SIZE = 100;
+
 	const table = useTableInfinite<Issue>({
 		tableId: "support-issues",
 		queryKey: () => [...props.queryKeys.list(state()), debouncedSearch()],
-		queryFn: async () => {
-			const result = await props.listIssues({ state: state() });
+		queryFn: async ({ page }) => {
+			const result = await props.listIssues({
+				state: state(),
+				page: page + 1,
+				perPage: PAGE_SIZE,
+			});
 			if (result.error || !result.data) {
 				return { data: [], count: 0, totalCount: 0 };
 			}
@@ -247,7 +257,7 @@ export function IssuesListPage(props: IssuesListPageProps) {
 			}
 			return { data: items, count: items.length, totalCount: items.length };
 		},
-		limit: 100,
+		limit: PAGE_SIZE,
 	});
 
 	const handleRowClick = (row: Issue) => {
