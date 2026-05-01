@@ -4,6 +4,9 @@ import {
 	useQueryClient,
 } from "@tanstack/solid-query";
 import {
+	Avatar,
+	AvatarFallback,
+	AvatarImage,
 	Badge,
 	Box,
 	Card,
@@ -15,6 +18,12 @@ import {
 } from "@xgx/ui";
 import { ArrowLeft } from "@xgx/ui/icons";
 import { For, type JSX, Show } from "solid-js";
+import {
+	getAssigneeInitials,
+	getIssueAssignees,
+	getWorkStartedAt,
+	type IssueAssignee,
+} from "../lib/assignee";
 import { parseCommentAuthor, parseIssueBody } from "../lib/parse-endmatter";
 import type { PriorityLabel } from "../lib/priority";
 import { filterNonPriorityLabels, getPriority } from "../lib/priority";
@@ -33,8 +42,12 @@ interface Issue {
 	body: string | null;
 	state: string;
 	created_at: string;
+	closed_at?: string | null;
 	labels: { name: string; color: string }[];
 	user: { login: string } | null;
+	assignee?: IssueAssignee | null;
+	assignees?: IssueAssignee[];
+	assigned_at?: string | null;
 }
 
 interface Comment {
@@ -161,6 +174,8 @@ export function IssueDetailPage(props: IssueDetailPageProps) {
 					<Show when={issue()}>
 						{(i) => {
 							const parsed = () => parseIssueBody(i());
+							const assignees = () => getIssueAssignees(i());
+							const workStartedAt = () => getWorkStartedAt(i());
 							return (
 								<Stack class="gap-4">
 									<Stack class="gap-2">
@@ -237,6 +252,65 @@ export function IssueDetailPage(props: IssueDetailPageProps) {
 											</Flex>
 										</Show>
 									</Stack>
+
+									<Box class="grid gap-3 border-y py-3 sm:grid-cols-3">
+										<Stack class="gap-1">
+											<Text size="xs" weight="medium">
+												Assignee
+											</Text>
+											<Show
+												when={assignees().length > 0}
+												fallback={
+													<Text size="xs" class="text-muted-foreground">
+														Unassigned
+													</Text>
+												}
+											>
+												<Stack class="gap-1.5">
+													<For each={assignees()}>
+														{(assignee) => (
+															<Flex align="center" gap="2" class="min-w-0">
+																<Avatar class="size-5">
+																	<AvatarImage
+																		src={assignee.avatar_url ?? undefined}
+																		alt={assignee.login}
+																	/>
+																	<AvatarFallback class="text-[10px]">
+																		{getAssigneeInitials(assignee.login)}
+																	</AvatarFallback>
+																</Avatar>
+																<Text size="xs" class="truncate">
+																	{assignee.login}
+																</Text>
+															</Flex>
+														)}
+													</For>
+												</Stack>
+											</Show>
+										</Stack>
+
+										<Stack class="gap-1">
+											<Text size="xs" weight="medium">
+												Assigned
+											</Text>
+											<Text size="xs" class="text-muted-foreground">
+												<Show when={workStartedAt()} fallback="Not assigned">
+													{(value) => fmt()(value())}
+												</Show>
+											</Text>
+										</Stack>
+
+										<Stack class="gap-1">
+											<Text size="xs" weight="medium">
+												Closed
+											</Text>
+											<Text size="xs" class="text-muted-foreground">
+												<Show when={i().closed_at} fallback="Open">
+													{(value) => fmt()(value())}
+												</Show>
+											</Text>
+										</Stack>
+									</Box>
 
 									<Show when={parsed().body}>
 										{(body) => (

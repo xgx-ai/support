@@ -38,6 +38,14 @@ export {
 export { fileToBase64 } from "./lib/file-to-base64";
 // --- Lib ---
 export {
+	getAssignedAt,
+	getAssigneeInitials,
+	getIssueAssignees,
+	getWorkStartedAt,
+	type IssueAssignee,
+	type IssueWithAssignees,
+} from "./lib/assignee";
+export {
 	parseCommentAuthor,
 	parseEndmatter,
 	parseIssueBody,

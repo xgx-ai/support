@@ -80,16 +80,29 @@ export interface GHUser {
 	avatar_url: string;
 }
 
-export interface GHIssue {
+interface GHRawIssue {
 	number: number;
 	title: string;
 	body: string | null;
 	state: "open" | "closed";
 	labels: GHLabel[];
 	user: GHUser | null;
+	assignee: GHUser | null;
+	assignees: GHUser[];
 	comments: number;
 	created_at: string;
 	updated_at: string;
+	closed_at: string | null;
+}
+
+export interface GHAssignee extends GHUser {
+	assigned_at: string | null;
+}
+
+export interface GHIssue extends Omit<GHRawIssue, "assignee" | "assignees"> {
+	assignee: GHAssignee | null;
+	assignees: GHAssignee[];
+	assigned_at: string | null;
 }
 
 export interface GHComment {
@@ -98,6 +111,13 @@ export interface GHComment {
 	user: GHUser | null;
 	created_at: string;
 	updated_at: string;
+}
+
+interface GHIssueEvent {
+	id: number;
+	event: string;
+	created_at: string;
+	assignee?: GHUser | null;
 }
 
 // --- Fetch Wrapper ---
@@ -137,6 +157,97 @@ function getRepo() {
 	return { owner, repo };
 }
 
+async function listIssueEvents(issueNumber: number): Promise<GHIssueEvent[]> {
+	const { owner, repo } = getRepo();
+	const perPage = 100;
+	let page = 1;
+	const allEvents: GHIssueEvent[] = [];
+
+	for (;;) {
+		const events = await ghFetch<GHIssueEvent[]>(
+			`/repos/${owner}/${repo}/issues/${issueNumber}/events?page=${page}&per_page=${perPage}`,
+		);
+		allEvents.push(...events);
+		if (events.length < perPage) break;
+		page += 1;
+	}
+
+	return allEvents;
+}
+
+export function findCurrentAssigneeAssignedAt(
+	events: GHIssueEvent[],
+	login: string,
+): string | null {
+	const sortedEvents = [...events].sort(
+		(a, b) =>
+			new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+	);
+	let assignedAt: string | null = null;
+
+	for (const event of sortedEvents) {
+		if (event.assignee?.login !== login) continue;
+
+		if (event.event === "assigned") {
+			assignedAt = event.created_at;
+		}
+		if (event.event === "unassigned") {
+			assignedAt = null;
+		}
+	}
+
+	return assignedAt;
+}
+
+function getCurrentAssigneeLogins(issue: GHRawIssue): Set<string> {
+	const logins = new Set<string>();
+	if (issue.assignee) {
+		logins.add(issue.assignee.login);
+	}
+	for (const assignee of issue.assignees ?? []) {
+		logins.add(assignee.login);
+	}
+	return logins;
+}
+
+async function hydrateIssueAssignment(issue: GHRawIssue): Promise<GHIssue> {
+	const logins = getCurrentAssigneeLogins(issue);
+	if (logins.size === 0) {
+		return {
+			...issue,
+			assignee: null,
+			assignees: [],
+			assigned_at: null,
+		};
+	}
+
+	let events: GHIssueEvent[] = [];
+	try {
+		events = await listIssueEvents(issue.number);
+	} catch (error) {
+		console.error(
+			`Error getting issue #${issue.number} assignment events:`,
+			error,
+		);
+	}
+
+	const withAssignedAt = (user: GHUser): GHAssignee => ({
+		...user,
+		assigned_at: findCurrentAssigneeAssignedAt(events, user.login),
+	});
+	const assignees = (issue.assignees ?? []).map(withAssignedAt);
+	const assignee = issue.assignee
+		? withAssignedAt(issue.assignee)
+		: assignees[0] ?? null;
+
+	return {
+		...issue,
+		assignee,
+		assignees,
+		assigned_at: assignee?.assigned_at ?? assignees[0]?.assigned_at ?? null,
+	};
+}
+
 export async function listIssues(params?: {
 	state?: "open" | "closed" | "all";
 	page?: number;
@@ -147,14 +258,18 @@ export async function listIssues(params?: {
 	const page = params?.page ?? 1;
 	const perPage = params?.perPage ?? 30;
 
-	return ghFetch<GHIssue[]>(
+	const issues = await ghFetch<GHRawIssue[]>(
 		`/repos/${owner}/${repo}/issues?state=${state}&page=${page}&per_page=${perPage}&sort=created&direction=desc`,
 	);
+	return Promise.all(issues.map((issue) => hydrateIssueAssignment(issue)));
 }
 
 export async function getIssue(issueNumber: number): Promise<GHIssue> {
 	const { owner, repo } = getRepo();
-	return ghFetch<GHIssue>(`/repos/${owner}/${repo}/issues/${issueNumber}`);
+	const issue = await ghFetch<GHRawIssue>(
+		`/repos/${owner}/${repo}/issues/${issueNumber}`,
+	);
+	return hydrateIssueAssignment(issue);
 }
 
 export async function createIssue(params: {
@@ -162,10 +277,11 @@ export async function createIssue(params: {
 	body: string;
 }): Promise<GHIssue> {
 	const { owner, repo } = getRepo();
-	return ghFetch<GHIssue>(`/repos/${owner}/${repo}/issues`, {
+	const issue = await ghFetch<GHRawIssue>(`/repos/${owner}/${repo}/issues`, {
 		method: "POST",
 		body: JSON.stringify({ title: params.title, body: params.body }),
 	});
+	return hydrateIssueAssignment(issue);
 }
 
 export async function listComments(

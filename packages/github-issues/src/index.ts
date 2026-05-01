@@ -8,6 +8,7 @@ export {
 	addLabels,
 	createComment,
 	createIssue,
+	type GHAssignee,
 	type GHComment,
 	type GHIssue,
 	type GHLabel,

@@ -1,10 +1,14 @@
 import { useQueryClient } from "@tanstack/solid-query";
 import type { ColumnDef } from "@tanstack/solid-table";
 import {
+	Avatar,
+	AvatarFallback,
+	AvatarImage,
 	Badge,
 	Button,
 	Card,
 	Flex,
+	Stack,
 	TableColumnHeader,
 	TableInfinite,
 	Text,
@@ -17,6 +21,13 @@ import {
 } from "@xgx/ui";
 import { MessageSquare, Plus } from "@xgx/ui/icons";
 import { createSignal, type JSX, onCleanup, Show, Suspense } from "solid-js";
+import {
+	getAssignedAt,
+	getAssigneeInitials,
+	getIssueAssignees,
+	getWorkStartedAt,
+	type IssueAssignee,
+} from "../lib/assignee";
 import { filterNonPriorityLabels, getPriority } from "../lib/priority";
 
 // ---------------------------------------------------------------------------
@@ -28,8 +39,12 @@ interface Issue {
 	title: string;
 	state: string;
 	created_at: string;
+	closed_at?: string | null;
 	comments: number;
 	labels: { name: string; color: string }[];
+	assignee?: IssueAssignee | null;
+	assignees?: IssueAssignee[];
+	assigned_at?: string | null;
 }
 
 type Envelope<T> = { data: T | null; error: string | null };
@@ -91,10 +106,20 @@ const defaultFormatDate = (iso: string) =>
 		year: "numeric",
 	});
 
+const defaultFormatTimestamp = (iso: string) =>
+	new Date(iso).toLocaleString("en-GB", {
+		day: "numeric",
+		month: "short",
+		year: "numeric",
+		hour: "2-digit",
+		minute: "2-digit",
+	});
+
 export function IssuesListPage(props: IssuesListPageProps) {
 	const queryClient = useQueryClient();
 	const { showResponseDialog, DialogResponse } = useResponseDialog();
 	const fmt = () => props.formatDate ?? defaultFormatDate;
+	const fmtTimestamp = () => props.formatDate ?? defaultFormatTimestamp;
 
 	const [state, setState] = createSignal<IssueState>("open");
 	const [searchValue, setSearchValue] = createSignal("");
@@ -191,6 +216,68 @@ export function IssuesListPage(props: IssuesListPageProps) {
 		},
 		...(props.extraColumns ?? []),
 		{
+			id: "assignee",
+			accessorFn: (row) => getIssueAssignees(row)[0]?.login ?? "",
+			meta: { displayName: "Assignee" },
+			header: (ctx) => (
+				<TableColumnHeader
+					title="Assignee"
+					sortable
+					sorted={ctx.column.getIsSorted()}
+					onSort={ctx.column.getToggleSortingHandler()}
+				/>
+			),
+			cell: (info) => {
+				const row = info.row.original;
+				const assignees = getIssueAssignees(row);
+				const primaryAssignee = assignees[0];
+				return (
+					<Show
+						when={primaryAssignee}
+						fallback={
+							<Text as="span" size="xs" class="text-muted-foreground">
+								Unassigned
+							</Text>
+						}
+					>
+						{(assignee) => {
+							const assignedAt = () =>
+								getAssignedAt(row, assignee()) ?? getWorkStartedAt(row);
+							return (
+								<Flex align="center" gap="2" class="min-w-0">
+									<Avatar class="size-5">
+										<AvatarImage
+											src={assignee().avatar_url ?? undefined}
+											alt={assignee().login}
+										/>
+										<AvatarFallback class="text-[10px]">
+											{getAssigneeInitials(assignee().login)}
+										</AvatarFallback>
+									</Avatar>
+									<Stack class="gap-0.5 min-w-0">
+										<Text as="span" size="xs" class="truncate">
+											{assignee().login}
+											<Show when={assignees.length > 1}>
+												{" "}
+												+{assignees.length - 1}
+											</Show>
+										</Text>
+										<Text as="span" size="xs" class="text-muted-foreground">
+											<Show when={assignedAt()} fallback="Assigned">
+												{(value) => <>Assigned {fmtTimestamp()(value())}</>}
+											</Show>
+										</Text>
+									</Stack>
+								</Flex>
+							);
+						}}
+					</Show>
+				);
+			},
+			enableSorting: true,
+			size: 180,
+		},
+		{
 			accessorKey: "comments",
 			meta: { displayName: "Comments" },
 			header: () => <TableColumnHeader title="Comments" />,
@@ -227,6 +314,27 @@ export function IssuesListPage(props: IssuesListPageProps) {
 			enableSorting: true,
 			size: 140,
 		},
+		{
+			accessorKey: "closed_at",
+			meta: { displayName: "Closed" },
+			header: (ctx) => (
+				<TableColumnHeader
+					title="Closed"
+					sortable
+					sorted={ctx.column.getIsSorted()}
+					onSort={ctx.column.getToggleSortingHandler()}
+				/>
+			),
+			cell: (info) => (
+				<Text as="span" size="xs" class="text-muted-foreground">
+					<Show when={info.getValue() as string | null} fallback="—">
+						{(closedAt) => fmtTimestamp()(closedAt())}
+					</Show>
+				</Text>
+			),
+			enableSorting: true,
+			size: 160,
+		},
 	];
 
 	const PAGE_SIZE = 100;
@@ -249,7 +357,10 @@ export function IssuesListPage(props: IssuesListPageProps) {
 				items = items.filter(
 					(i) =>
 						i.title.toLowerCase().includes(search) ||
-						String(i.number).includes(search),
+						String(i.number).includes(search) ||
+						getIssueAssignees(i).some((assignee) =>
+							assignee.login.toLowerCase().includes(search),
+						),
 				);
 			}
 			if (props.transformIssues) {
