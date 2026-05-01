@@ -1,5 +1,6 @@
 export interface IssueAssignee {
 	login: string;
+	name?: string | null;
 	avatar_url?: string | null;
 	assigned_at?: string | null;
 }
@@ -12,6 +13,10 @@ export interface IssueWithAssignees {
 
 export function getAssigneeInitials(login: string): string {
 	return login.slice(0, 2).toUpperCase();
+}
+
+export function getAssigneeDisplayName(assignee: IssueAssignee): string {
+	return assignee.name?.trim() || assignee.login;
 }
 
 export function getIssueAssignees(issue: IssueWithAssignees): IssueAssignee[] {

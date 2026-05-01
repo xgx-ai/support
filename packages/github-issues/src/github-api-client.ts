@@ -78,6 +78,7 @@ export interface GHLabel {
 export interface GHUser {
 	login: string;
 	avatar_url: string;
+	name?: string | null;
 }
 
 interface GHRawIssue {
@@ -120,6 +121,10 @@ interface GHIssueEvent {
 	assignee?: GHUser | null;
 }
 
+interface GHUserProfile {
+	name: string | null;
+}
+
 // --- Fetch Wrapper ---
 
 async function ghFetch<T>(path: string, options?: RequestInit): Promise<T> {
@@ -155,6 +160,20 @@ async function ghFetch<T>(path: string, options?: RequestInit): Promise<T> {
 function getRepo() {
 	const { owner, repo } = getAppConfig();
 	return { owner, repo };
+}
+
+const userProfileCache = new Map<string, Promise<GHUserProfile>>();
+
+async function getUserProfile(login: string): Promise<GHUserProfile> {
+	const cached = userProfileCache.get(login);
+	if (cached) return cached;
+
+	const request = ghFetch<GHUserProfile>(`/users/${login}`).catch((error) => {
+		console.error(`Error getting GitHub user profile for ${login}:`, error);
+		return { name: null };
+	});
+	userProfileCache.set(login, request);
+	return request;
 }
 
 async function listIssueEvents(issueNumber: number): Promise<GHIssueEvent[]> {
@@ -231,13 +250,17 @@ async function hydrateIssueAssignment(issue: GHRawIssue): Promise<GHIssue> {
 		);
 	}
 
-	const withAssignedAt = (user: GHUser): GHAssignee => ({
-		...user,
-		assigned_at: findCurrentAssigneeAssignedAt(events, user.login),
-	});
-	const assignees = (issue.assignees ?? []).map(withAssignedAt);
+	const withAssignedAt = async (user: GHUser): Promise<GHAssignee> => {
+		const profile = await getUserProfile(user.login);
+		return {
+			...user,
+			name: profile.name ?? user.name ?? null,
+			assigned_at: findCurrentAssigneeAssignedAt(events, user.login),
+		};
+	};
+	const assignees = await Promise.all((issue.assignees ?? []).map(withAssignedAt));
 	const assignee = issue.assignee
-		? withAssignedAt(issue.assignee)
+		? await withAssignedAt(issue.assignee)
 		: assignees[0] ?? null;
 
 	return {

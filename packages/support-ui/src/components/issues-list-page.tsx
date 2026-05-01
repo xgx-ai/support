@@ -1,14 +1,10 @@
 import { useQueryClient } from "@tanstack/solid-query";
 import type { ColumnDef } from "@tanstack/solid-table";
 import {
-	Avatar,
-	AvatarFallback,
-	AvatarImage,
 	Badge,
 	Button,
 	Card,
 	Flex,
-	Stack,
 	TableColumnHeader,
 	TableInfinite,
 	Text,
@@ -23,7 +19,7 @@ import { MessageSquare, Plus } from "@xgx/ui/icons";
 import { createSignal, type JSX, onCleanup, Show, Suspense } from "solid-js";
 import {
 	getAssignedAt,
-	getAssigneeInitials,
+	getAssigneeDisplayName,
 	getIssueAssignees,
 	getWorkStartedAt,
 	type IssueAssignee,
@@ -217,7 +213,10 @@ export function IssuesListPage(props: IssuesListPageProps) {
 		...(props.extraColumns ?? []),
 		{
 			id: "assignee",
-			accessorFn: (row) => getIssueAssignees(row)[0]?.login ?? "",
+			accessorFn: (row) => {
+				const assignee = getIssueAssignees(row)[0];
+				return assignee ? getAssigneeDisplayName(assignee) : "";
+			},
 			meta: { displayName: "Assignee" },
 			header: (ctx) => (
 				<TableColumnHeader
@@ -244,30 +243,25 @@ export function IssuesListPage(props: IssuesListPageProps) {
 							const assignedAt = () =>
 								getAssignedAt(row, assignee()) ?? getWorkStartedAt(row);
 							return (
-								<Flex align="center" gap="2" class="min-w-0">
-									<Avatar class="size-5">
-										<AvatarImage
-											src={assignee().avatar_url ?? undefined}
-											alt={assignee().login}
-										/>
-										<AvatarFallback class="text-[10px]">
-											{getAssigneeInitials(assignee().login)}
-										</AvatarFallback>
-									</Avatar>
-									<Stack class="gap-0.5 min-w-0">
-										<Text as="span" size="xs" class="truncate">
-											{assignee().login}
-											<Show when={assignees.length > 1}>
-												{" "}
-												+{assignees.length - 1}
-											</Show>
-										</Text>
-										<Text as="span" size="xs" class="text-muted-foreground">
-											<Show when={assignedAt()} fallback="Assigned">
-												{(value) => <>Assigned {fmtTimestamp()(value())}</>}
-											</Show>
-										</Text>
-									</Stack>
+								<Flex align="center" gap="1.5" class="min-w-0">
+									<Text as="span" size="xs" class="truncate min-w-0">
+										{getAssigneeDisplayName(assignee())}
+										<Show when={assignees.length > 1}>
+											{" "}
+											+{assignees.length - 1}
+										</Show>
+									</Text>
+									<Show when={assignedAt()}>
+										{(value) => (
+											<Text
+												as="span"
+												size="xs"
+												class="shrink-0 text-muted-foreground"
+											>
+												{fmtTimestamp()(value())}
+											</Text>
+										)}
+									</Show>
 								</Flex>
 							);
 						}}
@@ -359,7 +353,9 @@ export function IssuesListPage(props: IssuesListPageProps) {
 						i.title.toLowerCase().includes(search) ||
 						String(i.number).includes(search) ||
 						getIssueAssignees(i).some((assignee) =>
-							assignee.login.toLowerCase().includes(search),
+							[assignee.login, getAssigneeDisplayName(assignee)].some((value) =>
+								value.toLowerCase().includes(search),
+							),
 						),
 				);
 			}

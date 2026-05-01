@@ -39,6 +39,7 @@ export { fileToBase64 } from "./lib/file-to-base64";
 // --- Lib ---
 export {
 	getAssignedAt,
+	getAssigneeDisplayName,
 	getAssigneeInitials,
 	getIssueAssignees,
 	getWorkStartedAt,

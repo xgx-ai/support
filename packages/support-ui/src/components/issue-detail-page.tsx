@@ -4,9 +4,6 @@ import {
 	useQueryClient,
 } from "@tanstack/solid-query";
 import {
-	Avatar,
-	AvatarFallback,
-	AvatarImage,
 	Badge,
 	Box,
 	Card,
@@ -19,7 +16,7 @@ import {
 import { ArrowLeft } from "@xgx/ui/icons";
 import { For, type JSX, Show } from "solid-js";
 import {
-	getAssigneeInitials,
+	getAssigneeDisplayName,
 	getIssueAssignees,
 	getWorkStartedAt,
 	type IssueAssignee,
@@ -269,20 +266,9 @@ export function IssueDetailPage(props: IssueDetailPageProps) {
 												<Stack class="gap-1.5">
 													<For each={assignees()}>
 														{(assignee) => (
-															<Flex align="center" gap="2" class="min-w-0">
-																<Avatar class="size-5">
-																	<AvatarImage
-																		src={assignee.avatar_url ?? undefined}
-																		alt={assignee.login}
-																	/>
-																	<AvatarFallback class="text-[10px]">
-																		{getAssigneeInitials(assignee.login)}
-																	</AvatarFallback>
-																</Avatar>
-																<Text size="xs" class="truncate">
-																	{assignee.login}
-																</Text>
-															</Flex>
+															<Text size="xs" class="truncate">
+																{getAssigneeDisplayName(assignee)}
+															</Text>
 														)}
 													</For>
 												</Stack>
@@ -291,10 +277,10 @@ export function IssueDetailPage(props: IssueDetailPageProps) {
 
 										<Stack class="gap-1">
 											<Text size="xs" weight="medium">
-												Assigned
+												Started
 											</Text>
 											<Text size="xs" class="text-muted-foreground">
-												<Show when={workStartedAt()} fallback="Not assigned">
+												<Show when={workStartedAt()} fallback="Not started">
 													{(value) => fmt()(value())}
 												</Show>
 											</Text>
