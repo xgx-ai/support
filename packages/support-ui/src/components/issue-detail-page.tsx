@@ -18,7 +18,6 @@ import { For, type JSX, Show } from "solid-js";
 import {
 	getAssigneeDisplayName,
 	getIssueAssignees,
-	getWorkStartedAt,
 	type IssueAssignee,
 } from "../lib/assignee";
 import { parseCommentAuthor, parseIssueBody } from "../lib/parse-endmatter";
@@ -172,7 +171,6 @@ export function IssueDetailPage(props: IssueDetailPageProps) {
 						{(i) => {
 							const parsed = () => parseIssueBody(i());
 							const assignees = () => getIssueAssignees(i());
-							const workStartedAt = () => getWorkStartedAt(i());
 							return (
 								<Stack class="gap-4">
 									<Stack class="gap-2">
@@ -250,7 +248,7 @@ export function IssueDetailPage(props: IssueDetailPageProps) {
 										</Show>
 									</Stack>
 
-									<Box class="grid gap-3 border-y py-3 sm:grid-cols-3">
+									<Box class="grid gap-3 border-y py-3 sm:grid-cols-2">
 										<Stack class="gap-1">
 											<Text size="xs" weight="medium">
 												Assignee
@@ -273,17 +271,6 @@ export function IssueDetailPage(props: IssueDetailPageProps) {
 													</For>
 												</Stack>
 											</Show>
-										</Stack>
-
-										<Stack class="gap-1">
-											<Text size="xs" weight="medium">
-												Started
-											</Text>
-											<Text size="xs" class="text-muted-foreground">
-												<Show when={workStartedAt()} fallback="Not started">
-													{(value) => fmt()(value())}
-												</Show>
-											</Text>
 										</Stack>
 
 										<Stack class="gap-1">

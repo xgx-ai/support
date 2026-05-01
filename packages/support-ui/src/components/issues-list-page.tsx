@@ -18,7 +18,6 @@ import {
 import { MessageSquare, Plus } from "@xgx/ui/icons";
 import { createSignal, type JSX, onCleanup, Show, Suspense } from "solid-js";
 import {
-	getAssignedAt,
 	getAssigneeDisplayName,
 	getIssueAssignees,
 	getWorkStartedAt,
@@ -288,8 +287,6 @@ export function IssuesListPage(props: IssuesListPageProps) {
 						}
 					>
 						{(assignee) => {
-							const assignedAt = () =>
-								getAssignedAt(row, assignee()) ?? getWorkStartedAt(row);
 							return (
 								<Flex align="center" gap="1.5" class="min-w-0">
 									<Text as="span" size="xs" class="truncate min-w-0">
@@ -299,17 +296,6 @@ export function IssuesListPage(props: IssuesListPageProps) {
 											+{assignees.length - 1}
 										</Show>
 									</Text>
-									<Show when={assignedAt()}>
-										{(value) => (
-											<Text
-												as="span"
-												size="xs"
-												class="shrink-0 text-muted-foreground"
-											>
-												{fmtTimestamp()(value())}
-											</Text>
-										)}
-									</Show>
 								</Flex>
 							);
 						}}

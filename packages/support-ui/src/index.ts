@@ -35,7 +35,6 @@ export {
 	PriorityPicker,
 	type PriorityPickerProps,
 } from "./components/priority-picker";
-export { fileToBase64 } from "./lib/file-to-base64";
 // --- Lib ---
 export {
 	getAssignedAt,
@@ -46,6 +45,7 @@ export {
 	type IssueAssignee,
 	type IssueWithAssignees,
 } from "./lib/assignee";
+export { fileToBase64 } from "./lib/file-to-base64";
 export {
 	parseCommentAuthor,
 	parseEndmatter,

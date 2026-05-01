@@ -258,10 +258,12 @@ async function hydrateIssueAssignment(issue: GHRawIssue): Promise<GHIssue> {
 			assigned_at: findCurrentAssigneeAssignedAt(events, user.login),
 		};
 	};
-	const assignees = await Promise.all((issue.assignees ?? []).map(withAssignedAt));
+	const assignees = await Promise.all(
+		(issue.assignees ?? []).map(withAssignedAt),
+	);
 	const assignee = issue.assignee
 		? await withAssignedAt(issue.assignee)
-		: assignees[0] ?? null;
+		: (assignees[0] ?? null);
 
 	return {
 		...issue,
