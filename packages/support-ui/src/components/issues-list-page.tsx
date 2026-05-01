@@ -46,6 +46,7 @@ interface Issue {
 type Envelope<T> = { data: T | null; error: string | null };
 
 type IssueState = "open" | "closed";
+type IssueListStatus = "open" | "in_progress" | "closed";
 
 export interface IssuesListPageProps {
 	/** Fetch issues list. */
@@ -111,6 +112,29 @@ const defaultFormatTimestamp = (iso: string) =>
 		minute: "2-digit",
 	});
 
+const issueStatusMeta = {
+	open: {
+		displayText: "Open",
+		variant: "primary",
+	},
+	in_progress: {
+		displayText: "In progress",
+		variant: "warning",
+	},
+	closed: {
+		displayText: "Closed",
+		variant: "secondary",
+	},
+} as const;
+
+function getIssueListStatus(issue: Issue): IssueListStatus {
+	if (issue.state === "closed" || issue.closed_at) return "closed";
+	if (getWorkStartedAt(issue) || getIssueAssignees(issue).length > 0) {
+		return "in_progress";
+	}
+	return "open";
+}
+
 export function IssuesListPage(props: IssuesListPageProps) {
 	const queryClient = useQueryClient();
 	const { showResponseDialog, DialogResponse } = useResponseDialog();
@@ -158,6 +182,30 @@ export function IssuesListPage(props: IssuesListPageProps) {
 				);
 			},
 			enableSorting: true,
+		},
+		{
+			id: "status",
+			accessorFn: getIssueListStatus,
+			meta: { displayName: "Status" },
+			header: (ctx) => (
+				<TableColumnHeader
+					title="Status"
+					sortable
+					sorted={ctx.column.getIsSorted()}
+					onSort={ctx.column.getToggleSortingHandler()}
+				/>
+			),
+			cell: (info) => {
+				const status = getIssueListStatus(info.row.original);
+				const meta = issueStatusMeta[status];
+				return (
+					<Badge variant={meta.variant} class="font-normal text-xxs">
+						{meta.displayText}
+					</Badge>
+				);
+			},
+			enableSorting: true,
+			size: 120,
 		},
 		{
 			id: "priority",
