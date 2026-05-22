@@ -8,7 +8,7 @@ export GH_HOST=github.com
 
 REPO="${GH_REPO:-${GITHUB_REPOSITORY:-}}"
 if [[ -z "$REPO" || "$REPO" == */*/* || "$REPO" != */* ]]; then
-  echo "Error: GH_REPO or GITHUB_REPOSITORY must be set to owner/repo format (e.g., GITHUB_REPOSITORY=xgx-ai/dms)" >&2
+  echo "Error: GH_REPO or GITHUB_REPOSITORY must be set to owner/repo format (e.g., GITHUB_REPOSITORY=owner/repo)" >&2
   exit 1
 fi
 export GH_REPO="$REPO"

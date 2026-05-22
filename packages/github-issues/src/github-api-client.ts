@@ -5,23 +5,45 @@ import { createGitHubAppJwt } from "./github-app-jwt";
 
 const GH_BASE_URL = "https://api.github.com";
 
-/** Owner is always xgx-ai for all consuming projects. */
-const OWNER = "xgx-ai";
+function parseRepository(value: string): { owner: string; repo: string } {
+	const [owner, repo, extra] = value.split("/");
+	if (!owner || !repo || extra) {
+		throw new Error("GitHub repository must be in owner/repo format.");
+	}
+	return { owner, repo };
+}
+
+function getRepositoryConfig(): { owner: string; repo: string } {
+	const repository = process.env.GITHUB_REPOSITORY;
+	if (repository) {
+		return parseRepository(repository);
+	}
+
+	const owner = process.env.GITHUB_REPO_OWNER;
+	const repo = process.env.GITHUB_REPO_NAME;
+	if (owner && repo) {
+		return { owner, repo };
+	}
+
+	throw new Error(
+		"GITHUB_REPOSITORY or both GITHUB_REPO_OWNER and GITHUB_REPO_NAME must be set.",
+	);
+}
 
 function getAppConfig() {
 	const appId = process.env.GITHUB_APP_ID;
 	const installationId = process.env.GITHUB_APP_INSTALLATION_ID;
 	const privateKeyBase64 = process.env.GITHUB_APP_PRIVATE_KEY_BASE64;
-	const repo = process.env.GITHUB_REPO_NAME;
+	const { owner, repo } = getRepositoryConfig();
 
 	if (!appId || !installationId || !privateKeyBase64 || !repo) {
 		throw new Error(
-			"GITHUB_APP_ID, GITHUB_APP_INSTALLATION_ID, GITHUB_APP_PRIVATE_KEY_BASE64, and GITHUB_REPO_NAME must be set.",
+			"GITHUB_APP_ID, GITHUB_APP_INSTALLATION_ID, GITHUB_APP_PRIVATE_KEY_BASE64, and GitHub repository config must be set.",
 		);
 	}
 
 	const privateKey = atob(privateKeyBase64);
-	return { appId, installationId, privateKey, owner: OWNER, repo };
+	return { appId, installationId, privateKey, owner, repo };
 }
 
 // --- Installation Token Cache ---

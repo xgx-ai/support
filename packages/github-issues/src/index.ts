@@ -22,5 +22,21 @@ export {
 	createGitHubAppJwt,
 	decodeJwtPayload,
 } from "./github-app-jwt";
-
 export { createIssuesRouter } from "./trpc";
+export {
+	type CreateIssueWebhookHandlerOptions,
+	createIssueWebhookHandler,
+	type GHIssueCommentWebhookPayload,
+	type GHIssueWebhookChanges,
+	type GHIssueWebhookComment,
+	type GHIssueWebhookIssue,
+	type GHIssueWebhookPayload,
+	type GHRepository,
+	type SupportCommentEventType,
+	type SupportCommentWebhookEvent,
+	type SupportIssueEventType,
+	type SupportIssueWebhookEvent,
+	type SupportWebhookEvent,
+	type SupportWebhookEventHandler,
+	type SupportWebhookEventType,
+} from "./webhooks";
