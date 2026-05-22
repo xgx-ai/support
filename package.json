@@ -1,6 +1,6 @@
 {
 	"name": "@xgx-ai/support",
-	"version": "0.1.6",
+	"version": "0.1.7",
 	"private": true,
 	"type": "module",
 	"workspaces": [
@@ -10,6 +10,9 @@
 	"exports": {
 		"./github-issues": "./packages/github-issues/src/index.ts",
 		"./ui": "./packages/support-ui/src/index.ts"
+	},
+	"bin": {
+		"support-github-webhook-replay": "./packages/github-issues/src/webhook-replay-cli.ts"
 	},
 	"scripts": {
 		"check": "biome check . && tsgo -p packages/github-issues/tsconfig.json && tsgo -p packages/support-ui/tsconfig.json"

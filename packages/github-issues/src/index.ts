@@ -24,6 +24,14 @@ export {
 } from "./github-app-jwt";
 export { createIssuesRouter } from "./trpc";
 export {
+	createIssueWebhookReplayPayload,
+	createIssueWebhookReplayRequest,
+	type IssueWebhookReplayEnv,
+	type IssueWebhookReplayOptions,
+	issueWebhookReplayOptionsFromEnv,
+	replayIssueWebhook,
+} from "./webhook-replay";
+export {
 	type CreateIssueWebhookHandlerOptions,
 	createIssueWebhookHandler,
 	type GHIssueCommentWebhookPayload,
