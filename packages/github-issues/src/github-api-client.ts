@@ -103,6 +103,8 @@ export interface GHUser {
 	name?: string | null;
 }
 
+export type GHIssueStateReason = "completed" | "not_planned" | "reopened";
+
 interface GHRawIssue {
 	number: number;
 	title: string;
@@ -116,6 +118,7 @@ interface GHRawIssue {
 	created_at: string;
 	updated_at: string;
 	closed_at: string | null;
+	state_reason: GHIssueStateReason | null;
 }
 
 export interface GHAssignee extends GHUser {

@@ -11,6 +11,7 @@ export {
 	type GHAssignee,
 	type GHComment,
 	type GHIssue,
+	type GHIssueStateReason,
 	type GHLabel,
 	type GHUser,
 	getIssue,

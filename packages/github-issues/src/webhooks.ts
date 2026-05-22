@@ -1,5 +1,5 @@
 import { parseEndmatter } from "./endmatter";
-import type { GHLabel, GHUser } from "./github-api-client";
+import type { GHIssueStateReason, GHLabel, GHUser } from "./github-api-client";
 
 export interface GHRepository {
 	id: number;
@@ -22,6 +22,7 @@ export interface GHIssueWebhookIssue {
 	created_at: string;
 	updated_at: string;
 	closed_at: string | null;
+	state_reason?: GHIssueStateReason | null;
 	html_url?: string;
 }
 

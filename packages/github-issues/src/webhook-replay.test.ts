@@ -44,6 +44,7 @@ describe("webhook replay helpers", () => {
 			issue: {
 				number: 42,
 				title: "Export fails",
+				state_reason: "completed",
 			},
 		});
 	});
@@ -63,5 +64,16 @@ describe("webhook replay helpers", () => {
 				GITHUB_WEBHOOK_SECRET: "secret",
 			}),
 		).toThrow("Missing SUPPORT_WEBHOOK_AUTHOR_ID");
+	});
+
+	test("reads issue state reason from the replay environment", () => {
+		const options = issueWebhookReplayOptionsFromEnv({
+			SUPPORT_WEBHOOK_URL: "http://localhost:8787/api/webhooks/support",
+			GITHUB_WEBHOOK_SECRET: "secret",
+			SUPPORT_WEBHOOK_AUTHOR_ID: "user_123",
+			SUPPORT_WEBHOOK_STATE_REASON: "not_planned",
+		});
+
+		expect(options.stateReason).toBe("not_planned");
 	});
 });

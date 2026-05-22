@@ -1,4 +1,5 @@
 import { buildEndmatter } from "./endmatter";
+import type { GHIssueStateReason } from "./github-api-client";
 import type { GHIssueWebhookPayload, GHRepository } from "./webhooks";
 
 export interface IssueWebhookReplayOptions {
@@ -14,6 +15,8 @@ export interface IssueWebhookReplayOptions {
 	tenant?: string;
 	/** GitHub issue action. Defaults to closed. */
 	action?: string;
+	/** GitHub issue close reason. Defaults to completed for closed replay payloads. */
+	stateReason?: GHIssueStateReason;
 	/** Issue number used in the replay payload. Defaults to the current timestamp. */
 	issueNumber?: number;
 	/** Issue title used in the replay payload. */
@@ -41,6 +44,7 @@ export interface IssueWebhookReplayEnv {
 	SUPPORT_WEBHOOK_BODY?: string;
 	SUPPORT_WEBHOOK_ISSUE_META_JSON?: string;
 	SUPPORT_WEBHOOK_ISSUE_NUMBER?: string;
+	SUPPORT_WEBHOOK_STATE_REASON?: string;
 	SUPPORT_WEBHOOK_TENANT?: string;
 	SUPPORT_WEBHOOK_TITLE?: string;
 	SUPPORT_WEBHOOK_URL?: string;
@@ -66,6 +70,22 @@ function optionalInteger(value: string | undefined, name: string) {
 		throw new Error(`${name} must be a positive integer.`);
 	}
 	return parsed;
+}
+
+function optionalStateReason(
+	value: string | undefined,
+): GHIssueStateReason | undefined {
+	if (!value) return undefined;
+	if (
+		value === "completed" ||
+		value === "not_planned" ||
+		value === "reopened"
+	) {
+		return value;
+	}
+	throw new Error(
+		"SUPPORT_WEBHOOK_STATE_REASON must be completed, not_planned, or reopened.",
+	);
 }
 
 function parseRepository(env: IssueWebhookReplayEnv): Partial<GHRepository> {
@@ -149,6 +169,7 @@ export function issueWebhookReplayOptionsFromEnv(
 			env.SUPPORT_WEBHOOK_ISSUE_NUMBER,
 			"SUPPORT_WEBHOOK_ISSUE_NUMBER",
 		),
+		stateReason: optionalStateReason(env.SUPPORT_WEBHOOK_STATE_REASON),
 		title: env.SUPPORT_WEBHOOK_TITLE,
 		body: env.SUPPORT_WEBHOOK_BODY,
 		issueMeta: parseIssueMetaJson(env.SUPPORT_WEBHOOK_ISSUE_META_JSON),
@@ -161,6 +182,8 @@ export function createIssueWebhookReplayPayload(
 ): GHIssueWebhookPayload {
 	const issueNumber = options.issueNumber ?? Date.now();
 	const action = options.action ?? "closed";
+	const stateReason =
+		options.stateReason ?? (action === "closed" ? "completed" : undefined);
 	const title = options.title ?? "Local support webhook replay";
 	const body = options.body ?? "Local webhook replay";
 	const timestamp = toIsoString(options.now);
@@ -193,6 +216,7 @@ export function createIssueWebhookReplayPayload(
 			created_at: timestamp,
 			updated_at: timestamp,
 			closed_at: action === "closed" ? timestamp : null,
+			state_reason: stateReason ?? null,
 			html_url: `${repository.html_url}/issues/${issueNumber}`,
 		},
 		repository,

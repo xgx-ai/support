@@ -49,6 +49,7 @@ describe("createIssueWebhookHandler", () => {
 				created_at: "2026-05-22T10:00:00Z",
 				updated_at: "2026-05-22T10:15:00Z",
 				closed_at: "2026-05-22T10:15:00Z",
+				state_reason: "not_planned",
 			},
 			repository: {
 				id: 1,
@@ -85,6 +86,7 @@ describe("createIssueWebhookHandler", () => {
 			issue: {
 				number: 42,
 				title: "Export fails",
+				state_reason: "not_planned",
 			},
 		});
 	});
