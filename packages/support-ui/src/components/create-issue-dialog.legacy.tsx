@@ -1,3 +1,4 @@
+import { useMutation } from "@tanstack/solid-query";
 import type { DialogContentProps } from "@xgx/ui";
 import {
 	Button,
@@ -42,8 +43,6 @@ export function CreateIssueDialog(props: CreateIssueDialogProps) {
 	const [priority, setPriority] = createSignal<PriorityLabel | undefined>(
 		undefined,
 	);
-	const [error, setError] = createSignal<Error | null>(null);
-	const [isPending, setIsPending] = createSignal(false);
 
 	const {
 		images,
@@ -54,31 +53,28 @@ export function CreateIssueDialog(props: CreateIssueDialogProps) {
 		buildBodyWithImages,
 	} = useImageUpload(props.uploadImage);
 
-	const createIssue = async (params: {
-		title: string;
-		body: string;
-		priority?: PriorityLabel;
-	}) => {
-		setIsPending(true);
-		setError(null);
-		try {
+	const createMutation = useMutation(() => ({
+		mutationFn: async (params: {
+			title: string;
+			body: string;
+			priority?: PriorityLabel;
+		}) => {
 			const transformed = props.onBeforeCreate
 				? { ...params, ...props.onBeforeCreate(params) }
 				: params;
 			const result = await props.createIssue(transformed);
 			if (result.error) throw new Error(result.error);
+			return result;
+		},
+		onSuccess: () => {
 			props.resolve(true);
-		} catch (cause) {
-			setError(cause instanceof Error ? cause : new Error(String(cause)));
-		} finally {
-			setIsPending(false);
-		}
-	};
+		},
+	}));
 
 	const handleSubmit = (e: SubmitEvent) => {
 		e.preventDefault();
 		const fullBody = buildBodyWithImages(body().trim());
-		void createIssue({
+		createMutation.mutate({
 			title: title(),
 			body: fullBody,
 			priority: priority(),
@@ -100,6 +96,7 @@ export function CreateIssueDialog(props: CreateIssueDialogProps) {
 					<TextFieldLabel>Description</TextFieldLabel>
 					<TextFieldTextArea
 						placeholder="Describe the issue in detail..."
+						autoResize
 						onPaste={handlePaste}
 					/>
 				</TextField>
@@ -120,9 +117,11 @@ export function CreateIssueDialog(props: CreateIssueDialogProps) {
 					}}
 				/>
 
-				<Show when={error()}>
+				<Show when={createMutation.error}>
 					<Text as="p" size="sm" variant="destructive">
-						{error()?.message ?? "Failed to create issue."}
+						{createMutation.error instanceof Error
+							? createMutation.error.message
+							: "Failed to create issue."}
 					</Text>
 				</Show>
 
@@ -131,17 +130,20 @@ export function CreateIssueDialog(props: CreateIssueDialogProps) {
 						type="button"
 						variant="outline"
 						onClick={props.reject}
-						disabled={isPending()}
+						disabled={createMutation.isPending}
 					>
 						Cancel
 					</Button>
 					<Button
 						type="submit"
 						disabled={
-							!title().trim() || !body().trim() || isPending() || uploading()
+							!title().trim() ||
+							!body().trim() ||
+							createMutation.isPending ||
+							uploading()
 						}
 					>
-						{isPending() ? "Creating..." : "Create Issue"}
+						{createMutation.isPending ? "Creating..." : "Create Issue"}
 					</Button>
 				</DialogFooter>
 			</Stack>

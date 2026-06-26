@@ -1,6 +1,6 @@
 {
 	"name": "@xgx-ai/support",
-	"version": "0.1.8",
+	"version": "0.1.9",
 	"private": true,
 	"type": "module",
 	"workspaces": [
@@ -9,7 +9,8 @@
 	],
 	"exports": {
 		"./github-issues": "./packages/github-issues/src/index.ts",
-		"./ui": "./packages/support-ui/src/index.ts"
+		"./ui": "./packages/support-ui/src/index.ts",
+		"./ui/legacy": "./packages/support-ui/src/legacy.ts"
 	},
 	"bin": {
 		"support-github-webhook-replay": "./packages/github-issues/src/webhook-replay-cli.ts"
@@ -18,20 +19,25 @@
 		"check": "biome check . && tsgo -p packages/github-issues/tsconfig.json && tsgo -p packages/support-ui/tsconfig.json"
 	},
 	"devDependencies": {
-		"@tanstack/solid-query": ">=5.0.0",
-		"@tanstack/solid-table": "^8.21.3",
-		"@xgx/ui": "github:xgx-ai/ui",
-		"solid-js": ">=1.9.0",
+		"@solidjs/web": "2.0.0-beta.14",
+		"@xgx/ui": "github:xgx-ai/ui#23363705933b258c183515c649524e822e5013eb",
+		"chart.js": "^4.5.1",
+		"solid-js": "2.0.0-beta.14",
 		"typescript": ">=5.7.2"
 	},
 	"peerDependencies": {
 		"@trpc/server": ">=11.0.0",
+		"@solidjs/web": "^2.0.0-beta.14",
 		"@xgx/ui": "*",
 		"solid-js": ">=1.9.0",
 		"@tanstack/solid-query": ">=5.0.0",
+		"@tanstack/solid-table": ">=8.0.0",
 		"zod": ">=4.0.0"
 	},
 	"peerDependenciesMeta": {
+		"@solidjs/web": {
+			"optional": true
+		},
 		"@xgx/ui": {
 			"optional": true
 		},
@@ -40,6 +46,47 @@
 		},
 		"@tanstack/solid-query": {
 			"optional": true
+		},
+		"@tanstack/solid-table": {
+			"optional": true
 		}
+	},
+	"overrides": {
+		"@tiptap/core": "3.20.4",
+		"@tiptap/extension-blockquote": "3.20.4",
+		"@tiptap/extension-bold": "3.20.4",
+		"@tiptap/extension-bubble-menu": "3.20.4",
+		"@tiptap/extension-bullet-list": "3.20.4",
+		"@tiptap/extension-code": "3.20.4",
+		"@tiptap/extension-code-block": "3.20.4",
+		"@tiptap/extension-collaboration": "3.20.4",
+		"@tiptap/extension-collaboration-caret": "3.20.4",
+		"@tiptap/extension-color": "3.20.4",
+		"@tiptap/extension-document": "3.20.4",
+		"@tiptap/extension-dropcursor": "3.20.4",
+		"@tiptap/extension-gapcursor": "3.20.4",
+		"@tiptap/extension-hard-break": "3.20.4",
+		"@tiptap/extension-heading": "3.20.4",
+		"@tiptap/extension-highlight": "3.20.4",
+		"@tiptap/extension-horizontal-rule": "3.20.4",
+		"@tiptap/extension-italic": "3.20.4",
+		"@tiptap/extension-link": "3.20.4",
+		"@tiptap/extension-list": "3.20.4",
+		"@tiptap/extension-list-item": "3.20.4",
+		"@tiptap/extension-list-keymap": "3.20.4",
+		"@tiptap/extension-ordered-list": "3.20.4",
+		"@tiptap/extension-paragraph": "3.20.4",
+		"@tiptap/extension-placeholder": "3.20.4",
+		"@tiptap/extension-strike": "3.20.4",
+		"@tiptap/extension-table": "3.20.4",
+		"@tiptap/extension-table-cell": "3.20.4",
+		"@tiptap/extension-table-header": "3.20.4",
+		"@tiptap/extension-table-row": "3.20.4",
+		"@tiptap/extension-text": "3.20.4",
+		"@tiptap/extension-text-style": "3.20.4",
+		"@tiptap/extension-underline": "3.20.4",
+		"@tiptap/extensions": "3.20.4",
+		"@tiptap/pm": "3.20.4",
+		"@tiptap/starter-kit": "3.20.4"
 	}
 }

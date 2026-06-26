@@ -1,4 +1,5 @@
-import { For, type JSX, Show } from "solid-js";
+import type { JSX } from "@solidjs/web";
+import { For, Show } from "solid-js";
 
 const MD_IMAGE_RE = /!\[([^\]]*)\]\(([^)]+)\)/g;
 

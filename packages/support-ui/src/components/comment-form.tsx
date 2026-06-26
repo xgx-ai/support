@@ -64,7 +64,6 @@ export function CommentForm(props: CommentFormProps) {
 			>
 				<TextFieldTextArea
 					placeholder="Write a comment..."
-					autoResize
 					class="min-h-24"
 					onPaste={handlePaste}
 				/>

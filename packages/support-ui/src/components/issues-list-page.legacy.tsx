@@ -1,5 +1,5 @@
-import type { JSX } from "@solidjs/web";
-import type { ColumnDef } from "@xgx/ui";
+import { useQueryClient } from "@tanstack/solid-query";
+import type { ColumnDef } from "@tanstack/solid-table";
 import {
 	Badge,
 	Button,
@@ -16,8 +16,7 @@ import {
 	useTableInfinite,
 } from "@xgx/ui";
 import { MessageSquare, Plus } from "@xgx/ui/icons";
-import { useQueryClient } from "@xgx/ui/query";
-import { createSignal, onCleanup, Show, Loading as Suspense } from "solid-js";
+import { createSignal, type JSX, onCleanup, Show, Suspense } from "solid-js";
 import {
 	getAssigneeDisplayName,
 	getIssueAssignees,
@@ -418,7 +417,9 @@ export function IssuesListPage(props: IssuesListPageProps) {
 		});
 
 		if (result) {
-			queryClient.invalidateQueries(props.queryKeys.all);
+			queryClient.invalidateQueries({
+				queryKey: props.queryKeys.all,
+			});
 		}
 	};
 

@@ -1,4 +1,8 @@
-import type { JSX } from "@solidjs/web";
+import {
+	createMutation,
+	createQuery,
+	useQueryClient,
+} from "@tanstack/solid-query";
 import {
 	Badge,
 	Box,
@@ -10,12 +14,7 @@ import {
 	Text,
 } from "@xgx/ui";
 import { ArrowLeft } from "@xgx/ui/icons";
-import {
-	createMutation,
-	createValueQuery,
-	useQueryClient,
-} from "@xgx/ui/query";
-import { For, Show } from "solid-js";
+import { For, type JSX, Show } from "solid-js";
 import {
 	getAssigneeDisplayName,
 	getIssueAssignees,
@@ -108,12 +107,12 @@ export function IssueDetailPage(props: IssueDetailPageProps) {
 	const queryClient = useQueryClient();
 	const fmt = () => props.formatDate ?? defaultFormatDate;
 
-	const issueQuery = createValueQuery(() => ({
+	const issueQuery = createQuery(() => ({
 		queryKey: props.queryKeys.detail(props.issueNumber),
 		queryFn: () => props.getIssue({ issueNumber: props.issueNumber }),
 	}));
 
-	const commentsQuery = createValueQuery(() => ({
+	const commentsQuery = createQuery(() => ({
 		queryKey: props.queryKeys.comments(props.issueNumber),
 		queryFn: () => props.listComments({ issueNumber: props.issueNumber }),
 	}));
@@ -131,7 +130,11 @@ export function IssueDetailPage(props: IssueDetailPageProps) {
 			if (result.error) throw new Error(result.error);
 			return result;
 		},
-		invalidates: [props.queryKeys.detail(props.issueNumber)],
+		onSuccess: () => {
+			queryClient.invalidateQueries({
+				queryKey: props.queryKeys.detail(props.issueNumber),
+			});
+		},
 	}));
 
 	const handleSubmitComment = async (body: string) => {
@@ -142,7 +145,9 @@ export function IssueDetailPage(props: IssueDetailPageProps) {
 		if (result.error) {
 			return { error: result.error };
 		}
-		queryClient.invalidateQueries(props.queryKeys.comments(props.issueNumber));
+		queryClient.invalidateQueries({
+			queryKey: props.queryKeys.comments(props.issueNumber),
+		});
 		return { error: null };
 	};
 
@@ -198,9 +203,7 @@ export function IssueDetailPage(props: IssueDetailPageProps) {
 													>
 														<PriorityPicker
 															value={p.label}
-															onChange={(v) =>
-																void priorityMutation.mutateAsync(v)
-															}
+															onChange={(v) => priorityMutation.mutate(v)}
 															disabled={priorityMutation.isPending}
 														/>
 													</Show>
