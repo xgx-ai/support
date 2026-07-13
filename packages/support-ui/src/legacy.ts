@@ -6,6 +6,7 @@ export {
 	type CommentFormProps,
 } from "./components/comment-form";
 export {
+	type CreatedIssue,
 	CreateIssueDialog,
 	type CreateIssueDialogProps,
 	type CreateIssueFn,

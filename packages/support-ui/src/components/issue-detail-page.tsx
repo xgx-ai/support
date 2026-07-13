@@ -10,6 +10,7 @@ import {
 	SuspenseFallback,
 	Text,
 	toast,
+	useResponseDialog,
 } from "@xgx/ui";
 import { ArrowLeft } from "@xgx/ui/icons";
 import {
@@ -28,6 +29,7 @@ import type { PriorityLabel } from "../lib/priority";
 import { filterNonPriorityLabels, getPriority } from "../lib/priority";
 import type { UploadImageFn } from "../lib/use-image-upload";
 import { CommentForm } from "./comment-form";
+import { CreateIssueDialog, type CreateIssueFn } from "./create-issue-dialog";
 import { MarkdownBody } from "./markdown-body";
 import { PriorityPicker } from "./priority-picker";
 
@@ -75,6 +77,17 @@ export interface IssueDetailPageProps {
 	}) => Promise<Envelope<Comment>>;
 	/** Close a ticket submitted by the current user. */
 	closeIssue?: (input: { issueNumber: number }) => Promise<Envelope<Issue>>;
+	/** Reopen a closed ticket. */
+	reopenIssue?: (input: { issueNumber: number }) => Promise<Envelope<Issue>>;
+	/** Create a new ticket, including one related to this ticket. */
+	createIssue?: CreateIssueFn;
+	/** Navigate to another ticket after creation or from a relationship link. */
+	onNavigateToIssue?: (issueNumber: number) => void;
+	/** Optional app-specific transformation for newly created tickets. */
+	onBeforeCreateIssue?: (params: { title: string; body: string }) => {
+		title: string;
+		body: string;
+	};
 	/** Update the priority of an issue. */
 	setPriority?: (input: {
 		issueNumber: number;
@@ -87,7 +100,7 @@ export interface IssueDetailPageProps {
 	queryKeys: {
 		detail: (issueNumber: number) => readonly unknown[];
 		comments: (issueNumber: number) => readonly unknown[];
-		/** Optional list key to invalidate after closing a ticket. */
+		/** Optional list key to invalidate after changing or creating a ticket. */
 		all?: readonly unknown[];
 	};
 
@@ -112,6 +125,7 @@ const defaultFormatDate = (iso: string) =>
 
 export function IssueDetailPage(props: IssueDetailPageProps) {
 	const queryClient = useQueryClient();
+	const { showResponseDialog, DialogResponse } = useResponseDialog();
 	const fmt = () => props.formatDate ?? defaultFormatDate;
 
 	const issueQuery = createValueQuery(() => ({
@@ -155,6 +169,21 @@ export function IssueDetailPage(props: IssueDetailPageProps) {
 		],
 	}));
 
+	const reopenMutation = createMutation(() => ({
+		mutationFn: async () => {
+			if (!props.reopenIssue) return;
+			const result = await props.reopenIssue({
+				issueNumber: props.issueNumber,
+			});
+			if (result.error) throw new Error(result.error);
+			return result;
+		},
+		invalidates: [
+			props.queryKeys.detail(props.issueNumber),
+			...(props.queryKeys.all ? [props.queryKeys.all] : []),
+		],
+	}));
+
 	const handleClose = async () => {
 		if (!window.confirm("Close this ticket?")) return;
 
@@ -166,6 +195,47 @@ export function IssueDetailPage(props: IssueDetailPageProps) {
 				error instanceof Error ? error.message : "Failed to close ticket",
 			);
 		}
+	};
+
+	const handleReopen = async () => {
+		try {
+			await reopenMutation.mutateAsync(undefined);
+			toast.success("Ticket reopened");
+		} catch (error) {
+			toast.error(
+				error instanceof Error ? error.message : "Failed to reopen ticket",
+			);
+		}
+	};
+
+	const handleCreateRelatedIssue = async () => {
+		if (!props.createIssue || !props.onNavigateToIssue) return;
+
+		let createdIssueNumber: number | undefined;
+		const created = await showResponseDialog({
+			title: "Tell us about the related issue",
+			description: `We’ll create a separate ticket and link it to #${props.issueNumber}.`,
+			class: "max-w-lg w-full",
+			content: (dialogProps) => (
+				<CreateIssueDialog
+					{...dialogProps}
+					uploadImage={props.uploadImage}
+					createIssue={props.createIssue as CreateIssueFn}
+					relatedIssueNumber={props.issueNumber}
+					onBeforeCreate={props.onBeforeCreateIssue}
+					onCreated={(issue) => {
+						createdIssueNumber = issue.number;
+					}}
+				/>
+			),
+		});
+
+		if (!created || createdIssueNumber === undefined) return;
+		queryClient.invalidateQueries(props.queryKeys.comments(props.issueNumber));
+		if (props.queryKeys.all) {
+			queryClient.invalidateQueries(props.queryKeys.all);
+		}
+		props.onNavigateToIssue(createdIssueNumber);
 	};
 
 	const handleSubmitComment = async (body: string) => {
@@ -316,6 +386,29 @@ export function IssueDetailPage(props: IssueDetailPageProps) {
 										</Stack>
 									</Box>
 
+									<Show when={parsed().relatedIssueNumber}>
+										{(relatedIssueNumber) => (
+											<Show
+												when={props.onNavigateToIssue}
+												fallback={
+													<Text size="xs" class="text-muted-foreground">
+														Related ticket #{relatedIssueNumber()}
+													</Text>
+												}
+											>
+												<Button
+													variant="outline"
+													size="sm"
+													onClick={() =>
+														props.onNavigateToIssue?.(relatedIssueNumber())
+													}
+												>
+													Related ticket #{relatedIssueNumber()}
+												</Button>
+											</Show>
+										)}
+									</Show>
+
 									<Show when={i().state === "open" && props.closeIssue}>
 										<Flex justify="end">
 											<Button
@@ -330,6 +423,55 @@ export function IssueDetailPage(props: IssueDetailPageProps) {
 													: "Close ticket"}
 											</Button>
 										</Flex>
+									</Show>
+
+									<Show
+										when={
+											i().state === "closed" &&
+											(props.reopenIssue ||
+												(props.createIssue && props.onNavigateToIssue))
+										}
+									>
+										<Box class="rounded-md border bg-muted/30 p-4">
+											<Stack class="gap-3">
+												<Stack class="gap-1">
+													<Text size="sm" weight="medium">
+														What would you like to do?
+													</Text>
+													<Text size="xs" class="text-muted-foreground">
+														Tell us whether this ticket needs more help or
+														whether you have a related issue.
+													</Text>
+												</Stack>
+												<Flex gap="2" class="flex-col sm:flex-row">
+													<Show when={props.reopenIssue}>
+														<Button
+															variant="outline"
+															size="sm"
+															class="w-full sm:w-auto"
+															onClick={() => void handleReopen()}
+															disabled={reopenMutation.isPending}
+														>
+															{reopenMutation.isPending
+																? "Reopening..."
+																: "My issue isn’t solved"}
+														</Button>
+													</Show>
+													<Show
+														when={props.createIssue && props.onNavigateToIssue}
+													>
+														<Button
+															size="sm"
+															class="w-full h-auto whitespace-normal sm:w-auto"
+															onClick={() => void handleCreateRelatedIssue()}
+															disabled={reopenMutation.isPending}
+														>
+															This is solved, but I have a related issue
+														</Button>
+													</Show>
+												</Flex>
+											</Stack>
+										</Box>
 									</Show>
 
 									<Show when={parsed().body}>
@@ -375,10 +517,38 @@ export function IssueDetailPage(props: IssueDetailPageProps) {
 														{fmt()(comment.created_at)}
 													</Text>
 												</Flex>
-												<MarkdownBody
-													text={parsed().body}
-													class="text-sm leading-relaxed text-foreground/90"
-												/>
+												<Show when={parsed().body}>
+													{(body) => (
+														<MarkdownBody
+															text={body()}
+															class="text-sm leading-relaxed text-foreground/90"
+														/>
+													)}
+												</Show>
+												<Show when={parsed().followUpIssueNumber}>
+													{(followUpIssueNumber) => (
+														<Show
+															when={props.onNavigateToIssue}
+															fallback={
+																<Text size="xs" class="text-muted-foreground">
+																	Related ticket #{followUpIssueNumber()}
+																</Text>
+															}
+														>
+															<Button
+																variant="outline"
+																size="sm"
+																onClick={() =>
+																	props.onNavigateToIssue?.(
+																		followUpIssueNumber(),
+																	)
+																}
+															>
+																Open related ticket #{followUpIssueNumber()}
+															</Button>
+														</Show>
+													)}
+												</Show>
 											</Stack>
 										);
 									}}
@@ -393,6 +563,7 @@ export function IssueDetailPage(props: IssueDetailPageProps) {
 						/>
 					</Stack>
 				</Card>
+				<DialogResponse />
 			</Stack>
 		</SuspenseFallback>
 	);

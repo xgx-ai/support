@@ -17,15 +17,24 @@ import { ImageAttachButton } from "./image-attach-button";
 import { ImageAttachmentChips } from "./image-attachment-chips";
 import { PriorityPicker } from "./priority-picker";
 
+export interface CreatedIssue {
+	number: number;
+}
+
 export type CreateIssueFn = (input: {
 	title: string;
 	body: string;
 	priority?: PriorityLabel;
-}) => Promise<{ data: unknown; error: string | null }>;
+	relatedIssueNumber?: number;
+}) => Promise<{ data: CreatedIssue | null; error: string | null }>;
 
 export interface CreateIssueDialogProps extends DialogContentProps<boolean> {
 	uploadImage: UploadImageFn;
 	createIssue: CreateIssueFn;
+	/** Link the new ticket to an existing closed ticket. */
+	relatedIssueNumber?: number;
+	/** Called with the created ticket before the dialogue closes. */
+	onCreated?: (issue: CreatedIssue) => void;
 	/**
 	 * Optional hook to transform the title/body before the create mutation fires.
 	 * Use this for app-specific additions (e.g. appending a PostHog session replay URL).
@@ -58,6 +67,7 @@ export function CreateIssueDialog(props: CreateIssueDialogProps) {
 		title: string;
 		body: string;
 		priority?: PriorityLabel;
+		relatedIssueNumber?: number;
 	}) => {
 		setIsPending(true);
 		setError(null);
@@ -67,6 +77,8 @@ export function CreateIssueDialog(props: CreateIssueDialogProps) {
 				: params;
 			const result = await props.createIssue(transformed);
 			if (result.error) throw new Error(result.error);
+			if (!result.data) throw new Error("The created ticket was not returned");
+			props.onCreated?.(result.data);
 			props.resolve(true);
 		} catch (cause) {
 			setError(cause instanceof Error ? cause : new Error(String(cause)));
@@ -82,6 +94,7 @@ export function CreateIssueDialog(props: CreateIssueDialogProps) {
 			title: title(),
 			body: fullBody,
 			priority: priority(),
+			relatedIssueNumber: props.relatedIssueNumber,
 		});
 	};
 

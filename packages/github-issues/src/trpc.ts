@@ -17,6 +17,7 @@ import {
 	getIssue,
 	listComments,
 	listIssues,
+	reopenIssue,
 	setLabels,
 } from "./github-api-client";
 import { isIssueAuthor } from "./issue-ownership";
@@ -43,6 +44,7 @@ const createIssueInput = z.object({
 	title: z.string().min(1).max(256),
 	body: z.string().min(1),
 	priority: priorityInput.optional(),
+	relatedIssueNumber: z.number().int().positive().optional(),
 });
 
 const listCommentsInput = z.object({
@@ -57,6 +59,10 @@ const createCommentInput = z.object({
 });
 
 const closeIssueInput = z.object({
+	issueNumber: z.number().int().positive(),
+});
+
+const reopenIssueInput = z.object({
 	issueNumber: z.number().int().positive(),
 });
 
@@ -114,15 +120,31 @@ async function handleGetIssue(
 	}
 }
 
-async function handleCreateIssue(
+/** @internal Exported for focused package tests. */
+export async function handleCreateIssue(
 	input: z.infer<typeof createIssueInput>,
 	author: string,
 	authorId: string,
 ): Promise<Envelope<GHIssue>> {
 	try {
 		const meta: Record<string, string> = { author, authorId };
-		const body = `**Submitted by ${author}**\n\n${input.body}${buildEndmatter(meta)}`;
+		let relatedPrefix = "";
+
+		if (input.relatedIssueNumber) {
+			const relatedIssue = await getIssue(input.relatedIssueNumber);
+			if (relatedIssue.state !== "closed") {
+				return {
+					data: null,
+					error: "Related tickets can only be created from a closed ticket",
+				};
+			}
+			meta.relatedIssueNumber = String(input.relatedIssueNumber);
+			relatedPrefix = `Related to #${input.relatedIssueNumber}\n\n`;
+		}
+
+		const body = `**Submitted by ${author}**\n\n${relatedPrefix}${input.body}${buildEndmatter(meta)}`;
 		const issue = await createIssue({ title: input.title, body });
+		let resultIssue = issue;
 
 		// Apply priority label if specified
 		if (input.priority) {
@@ -131,16 +153,56 @@ async function handleCreateIssue(
 				labels: [input.priority],
 			});
 			// Refresh to get updated labels
-			const updated = await getIssue(issue.number);
-			return { data: updated, error: null };
+			resultIssue = await getIssue(issue.number);
 		}
 
-		return { data: issue, error: null };
+		if (input.relatedIssueNumber) {
+			const commentMeta: Record<string, string> = {
+				author,
+				authorId,
+				followUpIssueNumber: String(issue.number),
+			};
+			const commentBody = `**${author}** wrote:\n\nRelated ticket created: #${issue.number}${buildEndmatter(commentMeta)}`;
+			try {
+				await createComment({
+					issueNumber: input.relatedIssueNumber,
+					body: commentBody,
+				});
+			} catch (error) {
+				console.error(
+					`Error adding related ticket backlink to #${input.relatedIssueNumber}:`,
+					error,
+				);
+			}
+		}
+
+		return { data: resultIssue, error: null };
 	} catch (error) {
 		console.error("Error creating issue:", error);
 		return {
 			data: null,
 			error: error instanceof Error ? error.message : "Failed to create issue",
+		};
+	}
+}
+
+/** @internal Exported for focused package tests. */
+export async function handleReopenIssue(
+	input: z.infer<typeof reopenIssueInput>,
+): Promise<Envelope<GHIssue>> {
+	try {
+		const issue = await getIssue(input.issueNumber);
+		if (issue.state === "open") {
+			return { data: issue, error: null };
+		}
+
+		const reopenedIssue = await reopenIssue(input.issueNumber);
+		return { data: reopenedIssue, error: null };
+	} catch (error) {
+		console.error("Error reopening issue:", error);
+		return {
+			data: null,
+			error: error instanceof Error ? error.message : "Failed to reopen issue",
 		};
 	}
 }
@@ -343,6 +405,10 @@ export function createIssuesRouter<
 		close: protectedProcedure
 			.input(closeIssueInput)
 			.mutation(({ input, ctx }) => handleCloseIssue(input, ctx.user.id)),
+
+		reopen: protectedProcedure
+			.input(reopenIssueInput)
+			.mutation(({ input }) => handleReopenIssue(input)),
 
 		setPriority: protectedProcedure
 			.input(setPriorityInput)

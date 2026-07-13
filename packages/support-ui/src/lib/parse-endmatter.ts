@@ -24,30 +24,72 @@ export function stripPrefix(body: string, pattern: RegExp): string {
 	return match?.[1] ?? body;
 }
 
+function parseIssueNumber(value: string | undefined): number | null {
+	if (!value || !/^\d+$/.test(value)) return null;
+	const issueNumber = Number(value);
+	return Number.isSafeInteger(issueNumber) && issueNumber > 0
+		? issueNumber
+		: null;
+}
+
 export function parseCommentAuthor(comment: {
 	body: string;
 	user: { login: string } | null;
-}): { author: string; body: string } {
+}): { author: string; body: string; followUpIssueNumber: number | null } {
 	const { body, meta } = parseEndmatter(comment.body);
+	const followUpIssueNumber = parseIssueNumber(meta.followUpIssueNumber);
+	const authoredBody = meta.author
+		? stripPrefix(body, /^\*\*.+?\*\* wrote:\n\n([\s\S]*)$/)
+		: body;
+	const backlinkText = followUpIssueNumber
+		? `Related ticket created: #${followUpIssueNumber}`
+		: null;
+
 	if (meta.author) {
 		return {
 			author: meta.author,
-			body: stripPrefix(body, /^\*\*.+?\*\* wrote:\n\n([\s\S]*)$/),
+			body: authoredBody === backlinkText ? "" : authoredBody,
+			followUpIssueNumber,
 		};
 	}
-	return { author: comment.user?.login ?? "Unknown", body };
+	return {
+		author: comment.user?.login ?? "Unknown",
+		body,
+		followUpIssueNumber,
+	};
 }
 
 export function parseIssueBody(issue: {
 	body: string | null;
 	user: { login: string } | null;
-}): { submitter: string | null; body: string | null } {
-	if (!issue.body) return { submitter: issue.user?.login ?? null, body: null };
+}): {
+	submitter: string | null;
+	body: string | null;
+	relatedIssueNumber: number | null;
+} {
+	if (!issue.body) {
+		return {
+			submitter: issue.user?.login ?? null,
+			body: null,
+			relatedIssueNumber: null,
+		};
+	}
 	const { body, meta } = parseEndmatter(issue.body);
+	const relatedIssueNumber = parseIssueNumber(meta.relatedIssueNumber);
+	const submittedBody = meta.author
+		? stripPrefix(body, /^\*\*Submitted by .+?\*\*\n\n([\s\S]*)$/)
+		: body;
+	const relatedPrefix = relatedIssueNumber
+		? `Related to #${relatedIssueNumber}\n\n`
+		: null;
+	const displayBody =
+		relatedPrefix && submittedBody.startsWith(relatedPrefix)
+			? submittedBody.slice(relatedPrefix.length)
+			: submittedBody;
+
 	return {
 		submitter: meta.author ?? issue.user?.login ?? null,
-		body: meta.author
-			? stripPrefix(body, /^\*\*Submitted by .+?\*\*\n\n([\s\S]*)$/)
-			: body,
+		body: displayBody,
+		relatedIssueNumber,
 	};
 }

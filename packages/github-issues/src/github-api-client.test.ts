@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { generateKeyPairSync } from "node:crypto";
-import { closeIssue } from "./github-api-client";
+import { closeIssue, reopenIssue } from "./github-api-client";
 
 const originalFetch = globalThis.fetch;
 const originalEnv = {
@@ -78,6 +78,67 @@ describe("closeIssue", () => {
 		expect(JSON.parse(String(issueRequest?.init?.body))).toEqual({
 			state: "closed",
 			state_reason: "completed",
+		});
+	});
+});
+
+describe("reopenIssue", () => {
+	test("reopens the GitHub issue with the reopened state reason", async () => {
+		const { privateKey } = generateKeyPairSync("rsa", {
+			modulusLength: 2048,
+			privateKeyEncoding: { type: "pkcs8", format: "pem" },
+			publicKeyEncoding: { type: "spki", format: "pem" },
+		});
+		process.env.GITHUB_APP_ID = "123";
+		process.env.GITHUB_APP_INSTALLATION_ID = "456";
+		process.env.GITHUB_APP_PRIVATE_KEY_BASE64 =
+			Buffer.from(privateKey).toString("base64");
+		process.env.GITHUB_REPOSITORY = "example/support";
+
+		let issueRequest: { url: string; init?: RequestInit } | undefined;
+		globalThis.fetch = Object.assign(
+			async (
+				input: URL | RequestInfo,
+				init?: BunFetchRequestInit | RequestInit,
+			) => {
+				const url = String(input);
+				if (url.endsWith("/app/installations/456/access_tokens")) {
+					return Response.json({
+						token: "installation-token",
+						expires_at: "2000-01-01T00:00:00Z",
+					});
+				}
+
+				issueRequest = { url, init };
+				return Response.json({
+					number: 42,
+					title: "Export fails",
+					body: "Help me",
+					state: "open",
+					labels: [],
+					user: null,
+					assignee: null,
+					assignees: [],
+					comments: 0,
+					created_at: "2026-07-13T10:00:00Z",
+					updated_at: "2026-07-13T10:10:00Z",
+					closed_at: null,
+					state_reason: "reopened",
+				});
+			},
+			{ preconnect: originalFetch.preconnect },
+		);
+
+		const issue = await reopenIssue(42);
+
+		expect(issue.state).toBe("open");
+		expect(issueRequest?.url).toBe(
+			"https://api.github.com/repos/example/support/issues/42",
+		);
+		expect(issueRequest?.init?.method).toBe("PATCH");
+		expect(JSON.parse(String(issueRequest?.init?.body))).toEqual({
+			state: "open",
+			state_reason: "reopened",
 		});
 	});
 });

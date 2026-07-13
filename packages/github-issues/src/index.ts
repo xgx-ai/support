@@ -18,6 +18,7 @@ export {
 	getIssue,
 	listComments,
 	listIssues,
+	reopenIssue,
 	setLabels,
 } from "./github-api-client";
 export {

@@ -347,6 +347,19 @@ export async function closeIssue(issueNumber: number): Promise<GHIssue> {
 	return hydrateIssueAssignment(issue);
 }
 
+/** Reopen a closed issue. */
+export async function reopenIssue(issueNumber: number): Promise<GHIssue> {
+	const { owner, repo } = getRepo();
+	const issue = await ghFetch<GHRawIssue>(
+		`/repos/${owner}/${repo}/issues/${issueNumber}`,
+		{
+			method: "PATCH",
+			body: JSON.stringify({ state: "open", state_reason: "reopened" }),
+		},
+	);
+	return hydrateIssueAssignment(issue);
+}
+
 export async function listComments(
 	issueNumber: number,
 	params?: { page?: number; perPage?: number },
