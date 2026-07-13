@@ -2,12 +2,14 @@ import type { JSX } from "@solidjs/web";
 import {
 	Badge,
 	Box,
+	Button,
 	Card,
 	Flex,
 	Heading,
 	Stack,
 	SuspenseFallback,
 	Text,
+	toast,
 } from "@xgx/ui";
 import { ArrowLeft } from "@xgx/ui/icons";
 import {
@@ -71,6 +73,8 @@ export interface IssueDetailPageProps {
 		issueNumber: number;
 		body: string;
 	}) => Promise<Envelope<Comment>>;
+	/** Close a ticket submitted by the current user. */
+	closeIssue?: (input: { issueNumber: number }) => Promise<Envelope<Issue>>;
 	/** Update the priority of an issue. */
 	setPriority?: (input: {
 		issueNumber: number;
@@ -83,6 +87,8 @@ export interface IssueDetailPageProps {
 	queryKeys: {
 		detail: (issueNumber: number) => readonly unknown[];
 		comments: (issueNumber: number) => readonly unknown[];
+		/** Optional list key to invalidate after closing a ticket. */
+		all?: readonly unknown[];
 	};
 
 	/** Optional date formatter. Defaults to `en-GB` locale string. */
@@ -133,6 +139,34 @@ export function IssueDetailPage(props: IssueDetailPageProps) {
 		},
 		invalidates: [props.queryKeys.detail(props.issueNumber)],
 	}));
+
+	const closeMutation = createMutation(() => ({
+		mutationFn: async () => {
+			if (!props.closeIssue) return;
+			const result = await props.closeIssue({
+				issueNumber: props.issueNumber,
+			});
+			if (result.error) throw new Error(result.error);
+			return result;
+		},
+		invalidates: [
+			props.queryKeys.detail(props.issueNumber),
+			...(props.queryKeys.all ? [props.queryKeys.all] : []),
+		],
+	}));
+
+	const handleClose = async () => {
+		if (!window.confirm("Close this ticket?")) return;
+
+		try {
+			await closeMutation.mutateAsync(undefined);
+			toast.success("Ticket closed");
+		} catch (error) {
+			toast.error(
+				error instanceof Error ? error.message : "Failed to close ticket",
+			);
+		}
+	};
 
 	const handleSubmitComment = async (body: string) => {
 		const result = await props.createComment({
@@ -281,6 +315,22 @@ export function IssueDetailPage(props: IssueDetailPageProps) {
 											</Text>
 										</Stack>
 									</Box>
+
+									<Show when={i().state === "open" && props.closeIssue}>
+										<Flex justify="end">
+											<Button
+												variant="outline"
+												size="sm"
+												class="text-destructive hover:text-destructive"
+												onClick={() => void handleClose()}
+												disabled={closeMutation.isPending}
+											>
+												{closeMutation.isPending
+													? "Closing..."
+													: "Close ticket"}
+											</Button>
+										</Flex>
+									</Show>
 
 									<Show when={parsed().body}>
 										{(body) => (

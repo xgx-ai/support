@@ -6,6 +6,7 @@ export { buildEndmatter, parseEndmatter } from "./endmatter";
 
 export {
 	addLabels,
+	closeIssue,
 	createComment,
 	createIssue,
 	type GHAssignee,

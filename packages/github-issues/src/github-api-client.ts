@@ -334,6 +334,19 @@ export async function createIssue(params: {
 	return hydrateIssueAssignment(issue);
 }
 
+/** Close an issue as completed. */
+export async function closeIssue(issueNumber: number): Promise<GHIssue> {
+	const { owner, repo } = getRepo();
+	const issue = await ghFetch<GHRawIssue>(
+		`/repos/${owner}/${repo}/issues/${issueNumber}`,
+		{
+			method: "PATCH",
+			body: JSON.stringify({ state: "closed", state_reason: "completed" }),
+		},
+	);
+	return hydrateIssueAssignment(issue);
+}
+
 export async function listComments(
 	issueNumber: number,
 	params?: { page?: number; perPage?: number },

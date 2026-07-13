@@ -8,6 +8,7 @@ import { z } from "zod";
 import { buildEndmatter } from "./endmatter";
 import {
 	addLabels,
+	closeIssue,
 	createComment,
 	createIssue,
 	type GHComment,
@@ -18,6 +19,7 @@ import {
 	listIssues,
 	setLabels,
 } from "./github-api-client";
+import { isIssueAuthor } from "./issue-ownership";
 
 // ---------------------------------------------------------------------------
 // Zod schemas
@@ -52,6 +54,10 @@ const listCommentsInput = z.object({
 const createCommentInput = z.object({
 	issueNumber: z.number().int().positive(),
 	body: z.string().min(1),
+});
+
+const closeIssueInput = z.object({
+	issueNumber: z.number().int().positive(),
 });
 
 const setPriorityInput = z.object({
@@ -180,6 +186,35 @@ async function handleCreateComment(
 	}
 }
 
+async function handleCloseIssue(
+	input: z.infer<typeof closeIssueInput>,
+	userId: string,
+): Promise<Envelope<GHIssue>> {
+	try {
+		const issue = await getIssue(input.issueNumber);
+
+		if (!isIssueAuthor(issue.body, userId)) {
+			return {
+				data: null,
+				error: "You can only close tickets you submitted",
+			};
+		}
+
+		if (issue.state === "closed") {
+			return { data: issue, error: null };
+		}
+
+		const closedIssue = await closeIssue(input.issueNumber);
+		return { data: closedIssue, error: null };
+	} catch (error) {
+		console.error("Error closing issue:", error);
+		return {
+			data: null,
+			error: error instanceof Error ? error.message : "Failed to close issue",
+		};
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Set priority handler
 // ---------------------------------------------------------------------------
@@ -304,6 +339,10 @@ export function createIssuesRouter<
 			.mutation(({ input, ctx }) =>
 				handleCreateComment(input, ctx.user.name ?? "Unknown", ctx.user.id),
 			),
+
+		close: protectedProcedure
+			.input(closeIssueInput)
+			.mutation(({ input, ctx }) => handleCloseIssue(input, ctx.user.id)),
 
 		setPriority: protectedProcedure
 			.input(setPriorityInput)
