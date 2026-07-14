@@ -109,6 +109,8 @@ export interface IssueDetailPageProps {
 
 	/** Optional date formatter. Defaults to `en-GB` locale string. */
 	formatDate?: (iso: string) => string;
+	/** Optional application-specific assignee name resolver. */
+	formatAssignee?: (assignee: IssueAssignee) => string;
 	/** Optional override for the "back to list" link. Rendered as-is. */
 	backLink?: JSX.Element;
 }
@@ -130,6 +132,8 @@ export function IssueDetailPage(props: IssueDetailPageProps) {
 	const queryClient = useQueryClient();
 	const { showResponseDialog, DialogResponse } = useResponseDialog();
 	const fmt = () => props.formatDate ?? defaultFormatDate;
+	const assigneeName = (assignee: IssueAssignee) =>
+		props.formatAssignee?.(assignee) ?? getAssigneeDisplayName(assignee);
 
 	const issueQuery = createQuery(() => ({
 		queryKey: props.queryKeys.detail(props.issueNumber),
@@ -405,7 +409,7 @@ export function IssueDetailPage(props: IssueDetailPageProps) {
 													<For each={assignees()}>
 														{(assignee) => (
 															<Text size="xs" class="truncate">
-																{getAssigneeDisplayName(assignee)}
+																{assigneeName(assignee)}
 															</Text>
 														)}
 													</For>

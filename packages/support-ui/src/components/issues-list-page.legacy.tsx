@@ -23,6 +23,7 @@ import {
 	getWorkStartedAt,
 	type IssueAssignee,
 } from "../lib/assignee";
+import { parseIssueBody } from "../lib/parse-endmatter";
 import { filterNonPriorityLabels, getPriority } from "../lib/priority";
 
 // ---------------------------------------------------------------------------
@@ -32,11 +33,13 @@ import { filterNonPriorityLabels, getPriority } from "../lib/priority";
 interface Issue {
 	number: number;
 	title: string;
+	body: string | null;
 	state: string;
 	created_at: string;
 	closed_at?: string | null;
 	comments: number;
 	labels: { name: string; color: string }[];
+	user: { login: string } | null;
 	assignee?: IssueAssignee | null;
 	assignees?: IssueAssignee[];
 	assigned_at?: string | null;
@@ -66,6 +69,8 @@ export interface IssuesListPageProps {
 
 	/** Optional date formatter. Defaults to `en-GB` short date. */
 	formatDate?: (iso: string) => string;
+	/** Optional application-specific assignee name resolver. */
+	formatAssignee?: (assignee: IssueAssignee) => string;
 
 	/**
 	 * Optional transform applied to the fetched issues list before display.
@@ -139,6 +144,8 @@ export function IssuesListPage(props: IssuesListPageProps) {
 	const { showResponseDialog, DialogResponse } = useResponseDialog();
 	const fmt = () => props.formatDate ?? defaultFormatDate;
 	const fmtTimestamp = () => props.formatDate ?? defaultFormatTimestamp;
+	const assigneeName = (assignee: IssueAssignee) =>
+		props.formatAssignee?.(assignee) ?? getAssigneeDisplayName(assignee);
 
 	const [state, setState] = createSignal<IssueState>("open");
 	const [searchValue, setSearchValue] = createSignal("");
@@ -226,6 +233,26 @@ export function IssuesListPage(props: IssuesListPageProps) {
 			size: 100,
 		},
 		{
+			id: "submitter",
+			accessorFn: (row) => parseIssueBody(row).submitter ?? "",
+			meta: { displayName: "Raised by" },
+			header: (ctx) => (
+				<TableColumnHeader
+					title="Raised by"
+					sortable
+					sorted={ctx.column.getIsSorted()}
+					onSort={ctx.column.getToggleSortingHandler()}
+				/>
+			),
+			cell: (info) => (
+				<Text as="span" size="xs" class="truncate">
+					{parseIssueBody(info.row.original).submitter ?? "Unknown"}
+				</Text>
+			),
+			enableSorting: true,
+			size: 180,
+		},
+		{
 			id: "labels",
 			meta: { displayName: "Labels" },
 			header: () => <TableColumnHeader title="Labels" />,
@@ -262,7 +289,7 @@ export function IssuesListPage(props: IssuesListPageProps) {
 			id: "assignee",
 			accessorFn: (row) => {
 				const assignee = getIssueAssignees(row)[0];
-				return assignee ? getAssigneeDisplayName(assignee) : "";
+				return assignee ? assigneeName(assignee) : "";
 			},
 			meta: { displayName: "Assignee" },
 			header: (ctx) => (
@@ -290,7 +317,7 @@ export function IssuesListPage(props: IssuesListPageProps) {
 							return (
 								<Flex align="center" gap="1.5" class="min-w-0">
 									<Text as="span" size="xs" class="truncate min-w-0">
-										{getAssigneeDisplayName(assignee())}
+										{assigneeName(assignee())}
 										<Show when={assignees.length > 1}>
 											{" "}
 											+{assignees.length - 1}
@@ -386,8 +413,11 @@ export function IssuesListPage(props: IssuesListPageProps) {
 					(i) =>
 						i.title.toLowerCase().includes(search) ||
 						String(i.number).includes(search) ||
+						(parseIssueBody(i).submitter ?? "")
+							.toLowerCase()
+							.includes(search) ||
 						getIssueAssignees(i).some((assignee) =>
-							[assignee.login, getAssigneeDisplayName(assignee)].some((value) =>
+							[assignee.login, assigneeName(assignee)].some((value) =>
 								value.toLowerCase().includes(search),
 							),
 						),
