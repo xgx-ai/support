@@ -28,6 +28,7 @@ import { parseCommentAuthor, parseIssueBody } from "../lib/parse-endmatter";
 import type { PriorityLabel } from "../lib/priority";
 import { filterNonPriorityLabels, getPriority } from "../lib/priority";
 import type { UploadImageFn } from "../lib/use-image-upload";
+import { type CloseIssueChoice, CloseIssueDialog } from "./close-issue-dialog";
 import { CommentForm } from "./comment-form";
 import { CreateIssueDialog, type CreateIssueFn } from "./create-issue-dialog";
 import { MarkdownBody } from "./markdown-body";
@@ -184,19 +185,6 @@ export function IssueDetailPage(props: IssueDetailPageProps) {
 		],
 	}));
 
-	const handleClose = async () => {
-		if (!window.confirm("Close this ticket?")) return;
-
-		try {
-			await closeMutation.mutateAsync(undefined);
-			toast.success("Ticket closed");
-		} catch (error) {
-			toast.error(
-				error instanceof Error ? error.message : "Failed to close ticket",
-			);
-		}
-	};
-
 	const handleReopen = async () => {
 		try {
 			await reopenMutation.mutateAsync(undefined);
@@ -208,7 +196,7 @@ export function IssueDetailPage(props: IssueDetailPageProps) {
 		}
 	};
 
-	const handleCreateRelatedIssue = async () => {
+	const handleCreateRelatedIssue = async (initialBody?: string) => {
 		if (!props.createIssue || !props.onNavigateToIssue) return;
 
 		let createdIssueNumber: number | undefined;
@@ -219,6 +207,7 @@ export function IssueDetailPage(props: IssueDetailPageProps) {
 			content: (dialogProps) => (
 				<CreateIssueDialog
 					{...dialogProps}
+					initialBody={initialBody}
 					uploadImage={props.uploadImage}
 					createIssue={props.createIssue as CreateIssueFn}
 					relatedIssueNumber={props.issueNumber}
@@ -236,6 +225,40 @@ export function IssueDetailPage(props: IssueDetailPageProps) {
 			queryClient.invalidateQueries(props.queryKeys.all);
 		}
 		props.onNavigateToIssue(createdIssueNumber);
+	};
+
+	const handleClose = async (body: string) => {
+		if (!props.closeIssue) return false;
+
+		const choice = await showResponseDialog<CloseIssueChoice>({
+			title: "Close support ticket",
+			description:
+				"Use your draft as the final comment, or carry it into a separate linked ticket.",
+			class: "max-w-lg w-full",
+			content: (dialogProps) => (
+				<CloseIssueDialog
+					{...dialogProps}
+					closeTicket={async (resolution) => {
+						if (resolution === "closed") {
+							const result = await props.createComment({
+								issueNumber: props.issueNumber,
+								body,
+							});
+							if (result.error) throw new Error(result.error);
+							queryClient.invalidateQueries(
+								props.queryKeys.comments(props.issueNumber),
+							);
+						}
+						await closeMutation.mutateAsync(undefined);
+					}}
+				/>
+			),
+		});
+
+		if (!choice) return false;
+		toast.success("Ticket closed");
+		if (choice === "related") await handleCreateRelatedIssue(body);
+		return true;
 	};
 
 	const handleSubmitComment = async (body: string) => {
@@ -409,22 +432,6 @@ export function IssueDetailPage(props: IssueDetailPageProps) {
 										)}
 									</Show>
 
-									<Show when={i().state === "open" && props.closeIssue}>
-										<Flex justify="end">
-											<Button
-												variant="outline"
-												size="sm"
-												class="text-destructive hover:text-destructive"
-												onClick={() => void handleClose()}
-												disabled={closeMutation.isPending}
-											>
-												{closeMutation.isPending
-													? "Closing..."
-													: "Close ticket"}
-											</Button>
-										</Flex>
-									</Show>
-
 									<Show
 										when={
 											i().state === "closed" &&
@@ -557,10 +564,13 @@ export function IssueDetailPage(props: IssueDetailPageProps) {
 						</Show>
 
 						{/* Add comment form */}
-						<CommentForm
-							onSubmit={handleSubmitComment}
-							uploadImage={props.uploadImage}
-						/>
+						<Show when={issue()?.state === "open"}>
+							<CommentForm
+								onClose={props.closeIssue ? handleClose : undefined}
+								onSubmit={handleSubmitComment}
+								uploadImage={props.uploadImage}
+							/>
+						</Show>
 					</Stack>
 				</Card>
 				<DialogResponse />

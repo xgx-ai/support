@@ -34,6 +34,8 @@ export interface CreateIssueDialogProps extends DialogContentProps<boolean> {
 	createIssue: CreateIssueFn;
 	/** Link the new ticket to an existing closed ticket. */
 	relatedIssueNumber?: number;
+	/** Seed the description when resolving a ticket into a related request. */
+	initialBody?: string;
 	/** Called with the created ticket before the dialogue closes. */
 	onCreated?: (issue: CreatedIssue) => void;
 	/**
@@ -48,7 +50,7 @@ export interface CreateIssueDialogProps extends DialogContentProps<boolean> {
 
 export function CreateIssueDialog(props: CreateIssueDialogProps) {
 	const [title, setTitle] = createSignal("");
-	const [body, setBody] = createSignal("");
+	const [body, setBody] = createSignal(props.initialBody ?? "");
 	const [priority, setPriority] = createSignal<PriorityLabel | undefined>(
 		undefined,
 	);

@@ -6,7 +6,7 @@ import {
 	TextFieldTextArea,
 	toast,
 } from "@xgx/ui";
-import { Send } from "@xgx/ui/icons";
+import { CircleCheck, Send } from "@xgx/ui/icons";
 import { createSignal } from "solid-js";
 import type { UploadImageFn } from "../lib/use-image-upload";
 import { useImageUpload } from "../lib/use-image-upload";
@@ -14,6 +14,7 @@ import { ImageAttachButton } from "./image-attach-button";
 import { ImageAttachmentChips } from "./image-attachment-chips";
 
 export interface CommentFormProps {
+	onClose?: (body: string) => Promise<boolean>;
 	onSubmit: (body: string) => Promise<{ error: string | null }>;
 	uploadImage: UploadImageFn;
 }
@@ -24,6 +25,7 @@ export interface CommentFormProps {
  */
 export function CommentForm(props: CommentFormProps) {
 	const [commentBody, setCommentBody] = createSignal("");
+	const [closing, setClosing] = createSignal(false);
 	const [submitting, setSubmitting] = createSignal(false);
 
 	const {
@@ -56,6 +58,28 @@ export function CommentForm(props: CommentFormProps) {
 		}
 	};
 
+	const handleClose = async () => {
+		const body = buildBodyWithImages(commentBody().trim());
+		if (!body || !props.onClose) return;
+
+		setClosing(true);
+		try {
+			if (await props.onClose(body)) {
+				setCommentBody("");
+				reset();
+			}
+		} catch (error) {
+			toast.error(
+				error instanceof Error ? error.message : "Failed to close ticket",
+			);
+		} finally {
+			setClosing(false);
+		}
+	};
+
+	const isPending = () => submitting() || closing() || uploading();
+	const isEmpty = () => !commentBody().trim() && images().length === 0;
+
 	return (
 		<Stack class="gap-3 pt-2">
 			<TextField
@@ -79,18 +103,26 @@ export function CommentForm(props: CommentFormProps) {
 						for (const file of files) uploadFile(file);
 					}}
 				/>
-				<Button
-					size="sm"
-					onClick={handleSubmit}
-					disabled={
-						(!commentBody().trim() && images().length === 0) ||
-						submitting() ||
-						uploading()
-					}
-				>
-					<Send class="size-3.5" />
-					{submitting() ? "Sending..." : "Send"}
-				</Button>
+				<Flex gap="2" align="center">
+					<Button
+						variant="outline"
+						size="sm"
+						class="text-destructive hover:text-destructive"
+						onClick={() => void handleClose()}
+						disabled={isEmpty() || isPending() || !props.onClose}
+					>
+						<CircleCheck class="size-3.5" />
+						{closing() ? "Closing..." : "Close ticket"}
+					</Button>
+					<Button
+						size="sm"
+						onClick={handleSubmit}
+						disabled={isEmpty() || isPending()}
+					>
+						<Send class="size-3.5" />
+						{submitting() ? "Sending..." : "Send"}
+					</Button>
+				</Flex>
 			</Flex>
 		</Stack>
 	);
