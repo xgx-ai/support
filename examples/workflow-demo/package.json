@@ -1,0 +1,27 @@
+{
+	"name": "@xgx-ai/support-workflow-demo",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"build": "bun build.ts",
+		"start": "bun dev.ts"
+	},
+	"dependencies": {
+		"@solidjs/signals": "2.0.0-beta.14",
+		"@solidjs/web": "2.0.0-beta.14",
+		"@xgx/ui": "github:xgx-ai/ui#23363705933b258c183515c649524e822e5013eb",
+		"chart.js": "^4.5.1",
+		"solid-js": "2.0.0-beta.14",
+		"zod": "^4.4.3"
+	},
+	"devDependencies": {
+		"@babel/core": "^7.29.7",
+		"@babel/preset-typescript": "^7.29.7",
+		"@types/bun": "latest",
+		"babel-preset-solid": "2.0.0-beta.14",
+		"bun-plugin-tailwind": "^0.1.2",
+		"tailwindcss": "^4.1.18",
+		"typescript": ">=5.7.2"
+	}
+}

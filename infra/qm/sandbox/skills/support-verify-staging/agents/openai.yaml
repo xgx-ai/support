@@ -1,0 +1,4 @@
+interface:
+  display_name: "Support Verify Staging"
+  short_description: "Verify merged changes in staging"
+  default_prompt: "Use $support-verify-staging to verify the exact merged SHA against the original support scenario."

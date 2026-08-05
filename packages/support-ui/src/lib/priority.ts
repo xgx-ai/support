@@ -1,19 +1,21 @@
 /**
  * Priority helpers.
  *
- * Tickets can carry a priority label (`p1`, `p2`, or `p3`) that maps to a
+ * Tickets can carry a priority label (`p0`, `p1`, `p2`, or `p3`) that maps to a
  * human-readable level shown in the UI:
  *
+ *   p0 → Critical
  *   p1 → High
  *   p2 → Medium
  *   p3 → Low   (default when no priority label is present)
  */
 
-export type PriorityLevel = "high" | "medium" | "low";
-export type PriorityLabel = "p1" | "p2" | "p3";
+export type PriorityLevel = "critical" | "high" | "medium" | "low";
+export type PriorityLabel = "p0" | "p1" | "p2" | "p3";
 
 /** Label names that represent a priority. */
 const PRIORITY_LABELS: Record<string, PriorityLevel> = {
+	p0: "critical",
 	p1: "high",
 	p2: "medium",
 	p3: "low",
@@ -21,6 +23,7 @@ const PRIORITY_LABELS: Record<string, PriorityLevel> = {
 
 /** Map from level back to the label name. */
 const LEVEL_TO_LABEL: Record<PriorityLevel, PriorityLabel> = {
+	critical: "p0",
 	high: "p1",
 	medium: "p2",
 	low: "p3",
@@ -31,6 +34,7 @@ export const PRIORITY_LABEL_NAMES = new Set(Object.keys(PRIORITY_LABELS));
 
 /** Human-readable display text for each level. */
 const DISPLAY_TEXT: Record<PriorityLevel, string> = {
+	critical: "Critical",
 	high: "High",
 	medium: "Medium",
 	low: "Low",
@@ -41,6 +45,7 @@ const DISPLAY_TEXT: Record<PriorityLevel, string> = {
  * These pair well with the `Badge` component's `variant="outline"` style.
  */
 const BADGE_COLORS: Record<PriorityLevel, string> = {
+	critical: "#9b2c2c", // dark red
 	high: "#e53e3e", // red
 	medium: "#dd6b20", // orange
 	low: "#718096", // gray
@@ -48,7 +53,7 @@ const BADGE_COLORS: Record<PriorityLevel, string> = {
 
 export interface Priority {
 	level: PriorityLevel;
-	/** The GitHub label name (e.g. "p1", "p2", "p3"). */
+	/** The GitHub label name (e.g. "p0", "p1", "p2", "p3"). */
 	label: PriorityLabel;
 	displayText: string;
 	color: string;
@@ -64,9 +69,13 @@ export function getPriority(labels: { name: string }[]): Priority {
 
 	for (const label of labels) {
 		const mapped = PRIORITY_LABELS[label.name.toLowerCase()];
+		if (mapped === "critical") {
+			level = "critical";
+			break;
+		}
 		if (mapped === "high") {
 			level = "high";
-			break; // can't go higher
+			continue;
 		}
 		if (mapped === "medium" && level === "low") {
 			level = "medium";

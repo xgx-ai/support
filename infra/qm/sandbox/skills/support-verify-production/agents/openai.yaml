@@ -1,0 +1,4 @@
+interface:
+  display_name: "Support Verify Production"
+  short_description: "Verify deployed changes in production"
+  default_prompt: "Use $support-verify-production to verify the exact deployed SHA with non-destructive checks."

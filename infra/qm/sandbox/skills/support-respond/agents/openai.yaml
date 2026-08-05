@@ -1,0 +1,4 @@
+interface:
+  display_name: "Support Respond"
+  short_description: "Draft verified customer responses"
+  default_prompt: "Use $support-respond to draft a customer-safe response using only verified evidence."

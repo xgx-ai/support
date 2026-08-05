@@ -2,6 +2,19 @@
 // Kept for consumers that still depend on TanStack Solid Query / Solid 1 APIs.
 
 export {
+	type AgentActivityAction,
+	type AgentActivityDetail,
+	type AgentActivityItem,
+	type AgentActivityLink,
+	AgentActivityPanel,
+	type AgentActivityPanelProps,
+	type AgentActivityStage,
+	type AgentActivityStatus,
+	type AgentActivityVisibility,
+	type AgentRiskLevel,
+	type AgentWorkflowSummary,
+} from "./components/agent-activity-panel";
+export {
 	CommentForm,
 	type CommentFormProps,
 } from "./components/comment-form";

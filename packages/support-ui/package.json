@@ -3,6 +3,9 @@
 	"version": "0.1.0",
 	"private": true,
 	"type": "module",
+	"devDependencies": {
+		"@types/bun": "^1.3.12"
+	},
 	"peerDependencies": {
 		"@solidjs/web": "^2.0.0-beta.14",
 		"@xgx/ui": "*",

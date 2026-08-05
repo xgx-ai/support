@@ -1,0 +1,116 @@
+export {
+	type AgentArtifact,
+	type AgentStage,
+	type AgentStageOutput,
+	type ArtifactVisibility,
+	type AutomationMode,
+	agentArtifactEnvelopeSchema,
+	agentArtifactSchema,
+	agentStageOutputSchema,
+	agentStageSchema,
+	artifactVisibilitySchema,
+	assertStageDecision,
+	automationModeSchema,
+	httpUrlSchema,
+	type RestrictedChange,
+	type RestrictedChangeCategory,
+	type RiskLevel,
+	riskLevelSchema,
+	type StaffWorkflowWorkspace,
+	SUPPORT_WORKFLOW_VERSION,
+	type SupportIssueSnapshot,
+	type SupportRoute,
+	supportRouteSchema,
+	type WorkflowAction,
+	type WorkflowActivity,
+	type WorkflowActivityStage,
+	type WorkflowApproval,
+	type WorkflowLease,
+	type WorkflowOutbox,
+	type WorkflowRecord,
+	type WorkflowReviewFeedback,
+	type WorkflowState,
+	workflowActionSchema,
+	workflowActivityStageSchema,
+	workflowLeaseSchema,
+	workflowOutboxSchema,
+	workflowReviewFeedbackSchema,
+	workflowStateSchema,
+} from "./contracts";
+export {
+	type CreateSupportWorkflowControllerOptions,
+	createSupportWorkflowController,
+	type IngestWorkflowResult,
+	type PerformWorkflowActionInput,
+	type SupportWorkflowController,
+} from "./controller";
+export {
+	type CreateSupportWorkflowWebhookEnqueuerOptions,
+	createSupportWorkflowWebhookEnqueuer,
+	type SupportWebhookEventLike,
+} from "./github-webhook";
+export {
+	deploymentKey,
+	githubEventKey,
+	hashValue,
+	publicResponseKey,
+	sha256,
+	stableJson,
+	stageIdempotencyKey,
+} from "./idempotency";
+export { evaluateRepositoryChanges, pathMatches } from "./policy";
+export type {
+	AgentRuntime,
+	AgentStageCapability,
+	AgentStageRequest,
+	Clock,
+	DeploymentPort,
+	IdGenerator,
+	PublicResponsePublisher,
+	RepositoryChangeSet,
+	RepositoryPort,
+	RepositoryStageWorkspace,
+	SupportRouteResolver,
+	WorkflowIngressJob,
+	WorkflowQueue,
+	WorkflowStore,
+	WorkflowStoreTransaction,
+} from "./ports";
+export {
+	type CreateQmClientOptions,
+	canonicalQmPayload,
+	createQmClient,
+	type QmClient,
+	QmClientError,
+	type QmClientErrorKind,
+	type QmFetch,
+	type QmTurnCompletion,
+	type QmTurnRequest,
+	signQmSourceRequest,
+} from "./qm-client";
+export {
+	type CreateQmAgentRuntimeOptions,
+	createQmAgentRuntime,
+	createSupportStagePrompt,
+	parseAgentStageOutput,
+} from "./qm-runtime";
+export {
+	createStaffWorkflowPanelView,
+	type StaffActivityStage,
+	type StaffActivityStatus,
+	type StaffWorkflowPanelView,
+} from "./staff-view";
+export {
+	assertTransition,
+	availableWorkflowActions,
+	canTransition,
+	runningStateForStage,
+	stageForState,
+	terminalWorkflowStates,
+} from "./state-machine";
+export { getStaffWorkflowWorkspace } from "./store";
+export {
+	createSupportWorkflowRouter,
+	type StaffWorkflowActionAuthorizationInput,
+	type StaffWorkflowActionAuthorizer,
+} from "./trpc";

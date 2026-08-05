@@ -1,0 +1,4 @@
+interface:
+  display_name: "Support Implement"
+  short_description: "Implement approved support changes"
+  default_prompt: "Use $support-implement to implement the approved plan within repository policy."

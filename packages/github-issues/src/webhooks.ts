@@ -1,5 +1,9 @@
 import { parseEndmatter } from "./endmatter";
 import type { GHIssueStateReason, GHLabel, GHUser } from "./github-api-client";
+import {
+	githubIssueCommentWebhookPayloadSchema,
+	githubIssueWebhookPayloadSchema,
+} from "./webhook-schema";
 
 export interface GHRepository {
 	id: number;
@@ -122,9 +126,9 @@ export type SupportWebhookEventHandler = (
 export interface CreateIssueWebhookHandlerOptions {
 	/** GitHub webhook secret used for the X-Hub-Signature-256 HMAC. */
 	secret: string;
-	/** Called for every supported issue or issue_comment webhook event. */
+	/** Durable dispatcher called for every supported event. Mutually exclusive with handlers. */
 	onEvent?: SupportWebhookEventHandler;
-	/** Called only for specific normalised event types. */
+	/** Per-type durable dispatchers. Mutually exclusive with onEvent. */
 	handlers?: Partial<
 		Record<SupportWebhookEventType, SupportWebhookEventHandler>
 	>;
@@ -186,21 +190,27 @@ function parseIssueBody(issue: GHIssueWebhookIssue): {
 	return parseEndmatter(issue.body);
 }
 
+type NormalisedWebhookResult =
+	| { event: SupportWebhookEvent; error: null }
+	| { event: null; error: string | null };
+
 function normaliseWebhookEvent(
 	githubEvent: string | null,
 	deliveryId: string | null,
 	payload: unknown,
-): SupportWebhookEvent | null {
-	if (
-		typeof payload !== "object" ||
-		payload === null ||
-		!("action" in payload) ||
-		!("issue" in payload)
-	) {
-		return null;
+): NormalisedWebhookResult {
+	const parsed =
+		githubEvent === "issues"
+			? githubIssueWebhookPayloadSchema.safeParse(payload)
+			: githubEvent === "issue_comment"
+				? githubIssueCommentWebhookPayloadSchema.safeParse(payload)
+				: null;
+	if (!parsed) return { event: null, error: null };
+	if (!parsed.success) {
+		return { event: null, error: "Invalid GitHub webhook payload" };
 	}
 
-	const issuePayload = payload as GHIssueWebhookPayload;
+	const issuePayload = parsed.data as GHIssueWebhookPayload;
 	const parsedIssue = parseIssueBody(issuePayload.issue);
 	const base = {
 		action: issuePayload.action,
@@ -216,33 +226,44 @@ function normaliseWebhookEvent(
 
 	if (githubEvent === "issues") {
 		return {
-			...base,
-			type: `issue.${issuePayload.action}` as SupportIssueEventType,
-			githubEvent,
-			label: issuePayload.label,
-			assignee: issuePayload.assignee,
+			event: {
+				...base,
+				type: `issue.${issuePayload.action}` as SupportIssueEventType,
+				githubEvent,
+				label: issuePayload.label,
+				assignee: issuePayload.assignee,
+			},
+			error: null,
 		};
 	}
 
-	if (githubEvent === "issue_comment" && "comment" in payload) {
-		const commentPayload = payload as GHIssueCommentWebhookPayload;
+	if (githubEvent === "issue_comment" && "comment" in parsed.data) {
+		const commentPayload = parsed.data as GHIssueCommentWebhookPayload;
 		const parsedComment = parseEndmatter(commentPayload.comment.body);
 		return {
-			...base,
-			type: `comment.${commentPayload.action}` as SupportCommentEventType,
-			githubEvent,
-			comment: commentPayload.comment,
-			commentBody: parsedComment.body,
-			commentMeta: parsedComment.meta,
+			event: {
+				...base,
+				type: `comment.${commentPayload.action}` as SupportCommentEventType,
+				githubEvent,
+				comment: commentPayload.comment,
+				commentBody: parsedComment.body,
+				commentMeta: parsedComment.meta,
+			},
+			error: null,
 		};
 	}
 
-	return null;
+	return { event: null, error: null };
 }
 
 export function createIssueWebhookHandler(
 	options: CreateIssueWebhookHandlerOptions,
 ): (req: Request) => Promise<Response> {
+	if (options.onEvent && Object.values(options.handlers ?? {}).some(Boolean)) {
+		throw new Error(
+			"Configure one durable webhook dispatcher: onEvent or handlers, not both",
+		);
+	}
 	return async function handleIssueWebhook(req: Request): Promise<Response> {
 		if (req.method !== "POST") {
 			return json({ data: null, error: "Method not allowed" }, 405);
@@ -274,7 +295,11 @@ export function createIssueWebhookHandler(
 			return json({ data: null, error: "Invalid JSON payload" }, 400);
 		}
 
-		const event = normaliseWebhookEvent(githubEvent, deliveryId, payload);
+		const normalised = normaliseWebhookEvent(githubEvent, deliveryId, payload);
+		if (normalised.error) {
+			return json({ data: null, error: normalised.error }, 400);
+		}
+		const event = normalised.event;
 		if (!event) {
 			return json(
 				{ data: { handled: false, event: githubEvent }, error: null },
@@ -282,8 +307,13 @@ export function createIssueWebhookHandler(
 			);
 		}
 
-		await options.handlers?.[event.type]?.(event);
-		await options.onEvent?.(event);
+		try {
+			const dispatch = options.onEvent ?? options.handlers?.[event.type];
+			await dispatch?.(event);
+		} catch (error) {
+			console.error("Support webhook dispatch failed", error);
+			return json({ data: null, error: "Webhook dispatch failed" }, 503);
+		}
 
 		return json(
 			{ data: { handled: true, event: event.type, deliveryId }, error: null },

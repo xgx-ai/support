@@ -9,6 +9,7 @@
 	],
 	"exports": {
 		"./github-issues": "./packages/github-issues/src/index.ts",
+		"./workflow": "./packages/support-workflow/src/index.ts",
 		"./ui": "./packages/support-ui/src/index.ts",
 		"./ui/legacy": "./packages/support-ui/src/legacy.ts"
 	},
@@ -16,7 +17,12 @@
 		"support-github-webhook-replay": "./packages/github-issues/src/webhook-replay-cli.ts"
 	},
 	"scripts": {
-		"check": "biome check . && tsgo -p packages/github-issues/tsconfig.json && tsgo -p packages/support-ui/tsconfig.json"
+		"check": "biome check . && tsgo -p packages/github-issues/tsconfig.json && tsgo -p packages/support-workflow/tsconfig.json && tsgo -p packages/support-ui/tsconfig.json",
+		"dev": "bun scripts/dev.ts",
+		"dev:qm": "bun scripts/dev.ts --qm-only",
+		"dev:ui": "bun --cwd examples/workflow-demo --watch dev.ts",
+		"demo:workflow": "bun packages/support-workflow/src/demo-cli.ts",
+		"test": "bun test packages examples/workflow-demo/lab.test.ts"
 	},
 	"devDependencies": {
 		"@solidjs/web": "2.0.0-beta.14",

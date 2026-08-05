@@ -35,6 +35,12 @@ export {
 	replayIssueWebhook,
 } from "./webhook-replay";
 export {
+	githubIssueCommentWebhookPayloadSchema,
+	githubIssueWebhookPayloadSchema,
+	issueCommentWebhookActionSchema,
+	issueWebhookActionSchema,
+} from "./webhook-schema";
+export {
 	type CreateIssueWebhookHandlerOptions,
 	createIssueWebhookHandler,
 	type GHIssueCommentWebhookPayload,

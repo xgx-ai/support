@@ -38,7 +38,7 @@ const getIssueInput = z.object({
 	issueNumber: z.number().int().positive(),
 });
 
-const priorityInput = z.enum(["p1", "p2", "p3"]);
+const priorityInput = z.enum(["p0", "p1", "p2", "p3"]);
 
 const createIssueInput = z.object({
 	title: z.string().min(1).max(256),
@@ -282,7 +282,7 @@ async function handleCloseIssue(
 // ---------------------------------------------------------------------------
 
 /** Priority label names we manage. */
-const PRIORITY_LABEL_SET = new Set(["p1", "p2", "p3"]);
+const PRIORITY_LABEL_SET = new Set(["p0", "p1", "p2", "p3"]);
 
 async function handleSetPriority(
 	input: z.infer<typeof setPriorityInput>,

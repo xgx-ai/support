@@ -32,6 +32,16 @@ async function request(
 }
 
 describe("createIssueWebhookHandler", () => {
+	test("requires one durable dispatcher per delivery", () => {
+		expect(() =>
+			createIssueWebhookHandler({
+				secret: "webhook-secret",
+				onEvent: () => undefined,
+				handlers: { "issue.opened": () => undefined },
+			}),
+		).toThrow("one durable webhook dispatcher");
+	});
+
 	test("normalises issue events and parses issue endmatter", async () => {
 		const secret = "webhook-secret";
 		const body = JSON.stringify({
@@ -104,5 +114,63 @@ describe("createIssueWebhookHandler", () => {
 		);
 
 		expect(response.status).toBe(401);
+	});
+
+	test("rejects malformed supported webhook payloads", async () => {
+		const secret = "webhook-secret";
+		const handler = createIssueWebhookHandler({ secret });
+		const response = await handler(
+			await request(
+				secret,
+				JSON.stringify({ action: "opened", issue: { number: "not-a-number" } }),
+				{
+					"x-github-event": "issues",
+					"x-github-delivery": "delivery-invalid",
+				},
+			),
+		);
+
+		expect(response.status).toBe(400);
+		expect(await response.json()).toEqual({
+			data: null,
+			error: "Invalid GitHub webhook payload",
+		});
+	});
+
+	test("returns a retryable response when durable dispatch fails", async () => {
+		const secret = "webhook-secret";
+		const body = JSON.stringify({
+			action: "opened",
+			issue: {
+				number: 42,
+				title: "Export fails",
+				body: "Steps",
+				state: "open",
+				labels: [],
+				user: null,
+				closed_at: null,
+				created_at: "2026-08-05T09:00:00.000Z",
+				updated_at: "2026-08-05T09:00:00.000Z",
+			},
+			repository: {
+				id: 1,
+				name: "support",
+				full_name: "example/support",
+			},
+		});
+		const handler = createIssueWebhookHandler({
+			secret,
+			onEvent: async () => {
+				throw new Error("queue unavailable");
+			},
+		});
+		const response = await handler(
+			await request(secret, body, {
+				"x-github-event": "issues",
+				"x-github-delivery": "delivery-retry",
+			}),
+		);
+
+		expect(response.status).toBe(503);
 	});
 });

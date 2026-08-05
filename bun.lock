@@ -44,6 +44,9 @@
     "packages/support-ui": {
       "name": "@xgx-ai/support-ui",
       "version": "0.1.0",
+      "devDependencies": {
+        "@types/bun": "^1.3.12",
+      },
       "peerDependencies": {
         "@solidjs/web": "^2.0.0-beta.14",
         "@tanstack/solid-query": ">=5.0.0",
@@ -58,6 +61,19 @@
         "@xgx/ui",
         "solid-js",
       ],
+    },
+    "packages/support-workflow": {
+      "name": "@xgx-ai/support-workflow",
+      "version": "0.1.0",
+      "dependencies": {
+        "zod": "^4.3.6",
+      },
+      "devDependencies": {
+        "@types/bun": "^1.3.12",
+      },
+      "peerDependencies": {
+        "@trpc/server": ">=11.0.0",
+      },
     },
   },
   "overrides": {
@@ -333,7 +349,9 @@
 
     "@xgx-ai/support-ui": ["@xgx-ai/support-ui@workspace:packages/support-ui"],
 
-    "@xgx/ui": ["@xgx/ui@github:xgx-ai/ui#2336370", { "dependencies": { "@atlaskit/pragmatic-drag-and-drop": "^1.5.0", "@atlaskit/pragmatic-drag-and-drop-hitbox": "^1.0.0", "@floating-ui/dom": "^1.7.6", "@tanstack/router-generator": "^1.150.0", "@tiptap/core": "3.20.4", "@tiptap/extension-bubble-menu": "3.20.4", "@tiptap/extension-collaboration": "3.20.4", "@tiptap/extension-collaboration-caret": "3.20.4", "@tiptap/extension-color": "3.20.4", "@tiptap/extension-highlight": "3.20.4", "@tiptap/extension-link": "3.20.4", "@tiptap/extension-placeholder": "3.20.4", "@tiptap/extension-table": "3.20.4", "@tiptap/extension-table-cell": "3.20.4", "@tiptap/extension-table-header": "3.20.4", "@tiptap/extension-table-row": "3.20.4", "@tiptap/extension-text-style": "3.20.4", "@tiptap/extension-underline": "3.20.4", "@tiptap/pm": "3.20.4", "@tiptap/starter-kit": "3.20.4", "@xyflow/system": "^0.0.75", "class-variance-authority": "^0.7.1", "clsx": "^2.1.1", "date-fns": "^4.1.0", "lucide-solid": "^0.563.0", "markdown-it": "^14.1.0", "tailwind-merge": "^3.4.0", "vega": "^6.2.0", "vega-embed": "^7.1.0", "vega-lite": "^6.4.2", "y-websocket": "^3.0.0", "yjs": "^13.6.30" } }, "xgx-ai-ui-2336370", "sha512-TzN7IPMebqETnnpLNVYX4r3mUU1ex19JEdPyZ7Qz2qpvGxApGAOLQlh9MudxPVZuPuHQjgNNp0E8gUSe5d4Vmw=="],
+    "@xgx-ai/support-workflow": ["@xgx-ai/support-workflow@workspace:packages/support-workflow"],
+
+    "@xgx/ui": ["@xgx/ui@github:xgx-ai/ui#2336370", { "dependencies": { "@atlaskit/pragmatic-drag-and-drop": "^1.5.0", "@atlaskit/pragmatic-drag-and-drop-hitbox": "^1.0.0", "@floating-ui/dom": "^1.7.6", "@tanstack/router-generator": "^1.150.0", "@tiptap/core": "3.20.4", "@tiptap/extension-bubble-menu": "3.20.4", "@tiptap/extension-collaboration": "3.20.4", "@tiptap/extension-collaboration-caret": "3.20.4", "@tiptap/extension-color": "3.20.4", "@tiptap/extension-highlight": "3.20.4", "@tiptap/extension-link": "3.20.4", "@tiptap/extension-placeholder": "3.20.4", "@tiptap/extension-table": "3.20.4", "@tiptap/extension-table-cell": "3.20.4", "@tiptap/extension-table-header": "3.20.4", "@tiptap/extension-table-row": "3.20.4", "@tiptap/extension-text-style": "3.20.4", "@tiptap/extension-underline": "3.20.4", "@tiptap/pm": "3.20.4", "@tiptap/starter-kit": "3.20.4", "@xyflow/system": "^0.0.75", "class-variance-authority": "^0.7.1", "clsx": "^2.1.1", "date-fns": "^4.1.0", "lucide-solid": "^0.563.0", "markdown-it": "^14.1.0", "tailwind-merge": "^3.4.0", "vega": "^6.2.0", "vega-embed": "^7.1.0", "vega-lite": "^6.4.2", "y-websocket": "^3.0.0", "yjs": "^13.6.30" } }, "xgx-ai-ui-2336370"],
 
     "@xyflow/system": ["@xyflow/system@0.0.75", "", { "dependencies": { "@types/d3-drag": "^3.0.7", "@types/d3-interpolate": "^3.0.4", "@types/d3-selection": "^3.0.10", "@types/d3-transition": "^3.0.8", "@types/d3-zoom": "^3.0.8", "d3-drag": "^3.0.0", "d3-interpolate": "^3.0.1", "d3-selection": "^3.0.0", "d3-zoom": "^3.0.0" } }, "sha512-iXs+AGFLi8w/VlAoc/iSxk+CxfT6o64Uw/k0CKASOPqjqz6E0rb5jFZgJtXGZCpfQI6OQpu5EnumP5fGxQheaQ=="],
 

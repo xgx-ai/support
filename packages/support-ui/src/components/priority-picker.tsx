@@ -10,13 +10,14 @@ export interface PriorityOption {
 }
 
 const PRIORITY_OPTIONS: PriorityOption[] = [
+	{ label: "Critical", level: "critical", value: "p0", color: "#9b2c2c" },
 	{ label: "High", level: "high", value: "p1", color: "#e53e3e" },
 	{ label: "Medium", level: "medium", value: "p2", color: "#dd6b20" },
 	{ label: "Low", level: "low", value: "p3", color: "#718096" },
 ];
 
 export interface PriorityPickerProps {
-	/** Currently selected priority label (e.g. "p1", "p2", "p3"). `undefined` means none selected. */
+	/** Currently selected priority label (e.g. "p0", "p1", "p2", "p3"). `undefined` means none selected. */
 	value: PriorityLabel | undefined;
 	/** Called when the user picks a priority. */
 	onChange: (value: PriorityLabel) => void;

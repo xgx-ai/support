@@ -1,0 +1,4 @@
+interface:
+  display_name: "Support Deploy"
+  short_description: "Dispatch approved immutable releases"
+  default_prompt: "Use $support-deploy to dispatch the configured deployment adapter for this approved SHA."
