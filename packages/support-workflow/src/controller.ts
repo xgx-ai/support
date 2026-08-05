@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { AgentClientError } from "./agent-client";
 import {
 	type AgentArtifact,
 	type AgentStage,
@@ -7,10 +8,12 @@ import {
 	assertStageDecision,
 	httpUrlSchema,
 	type RiskLevel,
+	repositoryCheckResultSchema,
 	type StaffWorkflowWorkspace,
 	SUPPORT_WORKFLOW_VERSION,
 	supportIssueSnapshotSchema,
 	supportRouteSchema,
+	type TestResult,
 	type WorkflowAction,
 	type WorkflowActivity,
 	type WorkflowApproval,
@@ -41,7 +44,6 @@ import type {
 	WorkflowStore,
 	WorkflowStoreTransaction,
 } from "./ports";
-import { QmClientError } from "./qm-client";
 import {
 	assertTransition,
 	availableWorkflowActions,
@@ -107,7 +109,7 @@ function isContractError(error: unknown): boolean {
 	return (
 		error instanceof z.ZodError ||
 		error instanceof SyntaxError ||
-		(error instanceof QmClientError && error.kind === "contract")
+		(error instanceof AgentClientError && error.kind === "contract")
 	);
 }
 
@@ -164,12 +166,20 @@ function repositoryStageSpec(
 	return undefined;
 }
 
-function capabilitiesForStage(stage: AgentStage): AgentStageCapability[] {
+function capabilitiesForStage(
+	stage: AgentStage,
+	workspace?: RepositoryStageWorkspace,
+): AgentStageCapability[] {
 	const capabilities: AgentStageCapability[] = ["issue_read"];
-	if (stage === "investigate" || stage === "qc") {
+	if (
+		(stage === "investigate" || stage === "qc") &&
+		workspace?.access === "read_only"
+	) {
 		capabilities.push("repository_read");
 	}
-	if (stage === "implement") capabilities.push("candidate_write");
+	if (stage === "implement" && workspace?.access === "candidate_write") {
+		capabilities.push("candidate_write");
+	}
 	if (stage === "verify_staging") capabilities.push("staging_read");
 	if (stage === "verify_production") capabilities.push("production_read");
 	return capabilities;
@@ -491,7 +501,7 @@ export function createSupportWorkflowController(
 						? "Support issue closed"
 						: "Support issue updated",
 				summary: oversized
-					? "The untrusted issue payload was not sent to QM because complete security screening could not be guaranteed."
+					? "The untrusted issue payload was not sent to an agent because complete security screening could not be guaranteed."
 					: state === "stale"
 						? "Existing approvals, pending effects, and in-flight work were invalidated."
 						: "The authoritative issue snapshot was refreshed.",
@@ -559,7 +569,7 @@ export function createSupportWorkflowController(
 				? "Input held for manual security review"
 				: "Support issue received",
 			summary: oversized
-				? "The untrusted issue payload was not sent to QM because complete security screening could not be guaranteed."
+				? "The untrusted issue payload was not sent to an agent because complete security screening could not be guaranteed."
 				: "Routed to " + parsedJob.route.targetRepository + ".",
 			actor: "Support ingress",
 			links: [],
@@ -645,7 +655,7 @@ export function createSupportWorkflowController(
 			status: nextState === "needs_human" ? "needs_human" : "failed",
 			title: stage + " failed",
 			summary: message,
-			actor: "QM " + stage,
+			actor: "Agent " + stage,
 			links: [],
 		});
 		return transition(
@@ -657,6 +667,55 @@ export function createSupportWorkflowController(
 			},
 			{ activities: [activity] },
 		);
+	};
+
+	const runTrustedRepositoryChecks = async (
+		workflow: WorkflowRecord,
+		stage: Extract<AgentStage, "implement" | "qc">,
+		workspace: RepositoryStageWorkspace,
+	): Promise<{ tests: TestResult[]; blockedLabels: string[] }> => {
+		const profile = workflow.route.executionProfile;
+		const results = z.array(repositoryCheckResultSchema).parse(
+			await options.repository.runChecks({
+				workflow,
+				stage,
+				workspace,
+				profile,
+			}),
+		);
+		const configured = new Map(
+			profile.checks.map((check) => [check.id, check]),
+		);
+		const byCheckId = new Map(
+			results.map((result) => [result.checkId, result]),
+		);
+		if (byCheckId.size !== results.length) {
+			throw new Error("Repository adapter returned duplicate check results");
+		}
+		for (const result of results) {
+			if (!configured.has(result.checkId)) {
+				throw new Error(
+					`Repository adapter returned unknown check ${result.checkId}`,
+				);
+			}
+		}
+		const tests: TestResult[] = profile.checks.map((check) => {
+			const result = byCheckId.get(check.id);
+			return {
+				checkId: check.id,
+				command: check.argv.join(" "),
+				status: result?.status ?? "not_run",
+				summary:
+					result?.summary ??
+					`Trusted repository adapter did not run ${check.label}.`,
+			};
+		});
+		return {
+			tests,
+			blockedLabels: profile.checks
+				.filter((check) => byCheckId.get(check.id)?.status !== "passed")
+				.map((check) => check.label),
+		};
 	};
 
 	const applyArtifact = async (
@@ -688,30 +747,36 @@ export function createSupportWorkflowController(
 			retryState: undefined,
 		};
 
+		if (artifact.stage === "implement" || artifact.stage === "qc") {
+			artifact = { ...artifact, tests: [] };
+		}
+
 		if (artifact.stage === "implement") {
 			if (!workspace || workspace.access !== "candidate_write") {
 				throw new Error("Implementation has no trusted candidate workspace");
 			}
-			const changeSet = await options.repository.inspectChanges(
-				claimed,
-				artifact,
-				workspace,
-			);
-			const policyFindings = evaluateRepositoryChanges(
-				changeSet,
-				claimed.route,
-			);
-			if (!claimed.baseSha || changeSet.baseSha !== claimed.baseSha) {
-				artifact = {
-					...artifact,
-					decision: "failed",
-					baseSha: claimed.baseSha,
-					headSha: undefined,
-					changedPaths: changeSet.changedPaths,
-					summary:
-						"The candidate was built from a different base SHA than the human-approved plan.",
-				};
-			} else {
+
+			const bindImplementationChangeSet = (
+				changeSet: Awaited<ReturnType<RepositoryPort["inspectChanges"]>>,
+			): void => {
+				if (!claimed.baseSha || changeSet.baseSha !== claimed.baseSha) {
+					artifact = {
+						...artifact,
+						decision: "failed",
+						baseSha: claimed.baseSha,
+						headSha: undefined,
+						changedPaths: changeSet.changedPaths,
+						summary:
+							"The candidate was built from a different base SHA than the human-approved plan.",
+					};
+					changes = { ...changes, headSha: undefined };
+					return;
+				}
+
+				const policyFindings = evaluateRepositoryChanges(
+					changeSet,
+					claimed.route,
+				);
 				artifact = {
 					...artifact,
 					baseSha: claimed.baseSha,
@@ -731,18 +796,68 @@ export function createSupportWorkflowController(
 					headSha: changeSet.headSha,
 					risk: maxRisk(changes.risk ?? claimed.risk, artifact.risk),
 				};
+			};
+
+			const initialChangeSet = await options.repository.inspectChanges(
+				claimed,
+				artifact,
+				workspace,
+			);
+			bindImplementationChangeSet(initialChangeSet);
+
+			if (artifact.decision === "pass") {
+				const checks = await runTrustedRepositoryChecks(
+					claimed,
+					"implement",
+					workspace,
+				);
+				artifact = { ...artifact, tests: checks.tests };
+				if (checks.blockedLabels.length > 0) {
+					artifact = {
+						...artifact,
+						decision: "failed",
+						summary: `Required trusted checks did not pass: ${checks.blockedLabels.join(", ")}.`,
+					};
+				}
+
+				const finalChangeSet = await options.repository.inspectChanges(
+					claimed,
+					artifact,
+					workspace,
+				);
+				bindImplementationChangeSet(finalChangeSet);
 			}
 		}
 
-		if (
-			artifact.stage === "qc" &&
-			(!artifact.headSha || artifact.headSha !== claimed.headSha)
-		) {
-			artifact = {
-				...artifact,
-				decision: "failed",
-				summary: "QC inspected a different commit SHA; approval is stale.",
-			};
+		if (artifact.stage === "qc") {
+			if (!workspace || workspace.access !== "read_only") {
+				throw new Error("QC has no trusted read-only candidate workspace");
+			}
+			if (
+				!claimed.headSha ||
+				artifact.headSha !== claimed.headSha ||
+				workspace.revision !== claimed.headSha
+			) {
+				artifact = {
+					...artifact,
+					decision: "failed",
+					summary: "QC inspected a different commit SHA; approval is stale.",
+				};
+			} else if (artifact.decision === "pass") {
+				const checks = await runTrustedRepositoryChecks(
+					claimed,
+					"qc",
+					workspace,
+				);
+				artifact = { ...artifact, tests: checks.tests };
+				if (checks.blockedLabels.length > 0) {
+					artifact = {
+						...artifact,
+						decision: "changes_requested",
+						summary: `Required trusted checks did not pass: ${checks.blockedLabels.join(", ")}.`,
+					};
+				}
+			}
 		}
 
 		if (artifact.stage === "verify_staging") {
@@ -868,7 +983,7 @@ export function createSupportWorkflowController(
 			title: artifact.title,
 			summary: artifact.summary,
 			details: artifact.details,
-			actor: "QM " + artifact.stage,
+			actor: "Agent " + artifact.stage,
 			artifactId: artifact.artifactId,
 			links: artifact.links,
 		});
@@ -968,7 +1083,7 @@ export function createSupportWorkflowController(
 				status: "running",
 				title: stage + " resumed",
 				summary:
-					"Replaying the persisted QM idempotency key after lease expiry.",
+					"Replaying the persisted agent idempotency key after lease expiry.",
 				actor: "Support worker",
 				links: [],
 			});
@@ -1021,8 +1136,8 @@ export function createSupportWorkflowController(
 			stage,
 			status: "running",
 			title: stage + " started",
-			summary: "QM stage attempt " + String(attempt) + " is running.",
-			actor: "QM " + stage,
+			summary: "Agent stage attempt " + String(attempt) + " is running.",
+			actor: "Agent " + stage,
 			links: [],
 		});
 		return persist(workflow, claimed, { activities: [activity] });
@@ -1065,7 +1180,7 @@ export function createSupportWorkflowController(
 				previousArtifacts,
 				reviewFeedback,
 				readOnly: stage !== "implement",
-				capabilities: capabilitiesForStage(stage),
+				capabilities: capabilitiesForStage(stage, workspace),
 				workspace,
 			});
 			const next = await applyArtifact(claimed, artifact, workspace);

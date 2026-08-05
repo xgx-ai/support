@@ -1,7 +1,15 @@
 import { describe, expect, test } from "bun:test";
-import type { AgentStageOutput, SupportRoute } from "./contracts";
+import type {
+	AgentStageOutput,
+	RepositoryCheckResult,
+	SupportRoute,
+} from "./contracts";
 import { createSupportWorkflowController } from "./controller";
-import type { DeploymentPort, WorkflowIngressJob } from "./ports";
+import type {
+	DeploymentPort,
+	RepositoryChangeSet,
+	WorkflowIngressJob,
+} from "./ports";
 import {
 	type AgentStageScript,
 	createFakeRepositoryPort,
@@ -17,11 +25,30 @@ const route: SupportRoute = {
 	id: "auno",
 	targetRepository: "example/auno",
 	baseBranch: "main",
-	qmScope: "team:support",
+	agentScope: "team:support",
 	automationMode: "full",
 	allowedPaths: ["src/**"],
 	forbiddenPaths: ["src/security/**"],
-	testCommands: ["bun test", "bun run check"],
+	executionProfile: {
+		kind: "nix-dev-shell",
+		profileId: "auno-support-v1",
+		flakeSubdir: ".",
+		workspaceSubdir: ".",
+		devShell: "support",
+		timeoutMs: 600_000,
+		checks: [
+			{
+				id: "tests",
+				label: "Unit tests",
+				argv: ["bun", "test"],
+			},
+			{
+				id: "check",
+				label: "Static checks",
+				argv: ["bun", "run", "check"],
+			},
+		],
+	},
 	stagingEnvironment: "staging",
 	productionEnvironment: "production",
 	deployAdapter: "github-actions",
@@ -66,13 +93,9 @@ const ingressJob = (
 
 function setup(input?: {
 	script?: AgentStageScript;
-	changeSet?: {
-		baseSha: string;
-		headSha: string;
-		changedPaths: string[];
-		patch?: string;
-		addedDependencies?: string[];
-	};
+	changeSet?: RepositoryChangeSet;
+	inspectChangeSets?: RepositoryChangeSet[];
+	checkResults?: Partial<Record<"implement" | "qc", RepositoryCheckResult[]>>;
 	deployment?: DeploymentPort;
 }) {
 	const manual = createManualClock();
@@ -86,6 +109,8 @@ function setup(input?: {
 	const repository = createFakeRepositoryPort({
 		baseSha: "base-sha",
 		changeSet: input?.changeSet,
+		inspectChangeSets: input?.inspectChangeSets,
+		checkResults: input?.checkResults,
 	});
 	const recordingDeployment = createRecordingDeploymentPort();
 	const deployment = input?.deployment ?? recordingDeployment;
@@ -264,7 +289,7 @@ describe("support workflow controller", () => {
 	});
 
 	test("uses the trusted repository diff to block a package change", async () => {
-		const { controller } = setup({
+		const { controller, repository } = setup({
 			changeSet: {
 				baseSha: "base-sha",
 				headSha: "candidate-sha",
@@ -286,6 +311,179 @@ describe("support workflow controller", () => {
 		expect(
 			workspace?.artifacts.at(-1)?.restrictedChanges.length,
 		).toBeGreaterThan(0);
+		expect(repository.checkRuns).toHaveLength(0);
+		expect(repository.operations).toEqual(["inspect:implement"]);
+	});
+
+	test("re-inspects after trusted checks and blocks generated Nix control changes", async () => {
+		const { controller, repository } = setup({
+			inspectChangeSets: [
+				{
+					baseSha: "base-sha",
+					headSha: "candidate-sha",
+					changedPaths: ["src/export.ts"],
+				},
+				{
+					baseSha: "base-sha",
+					headSha: "candidate-sha",
+					changedPaths: ["src/export.ts", "src/generated-shell.nix"],
+				},
+			],
+		});
+		let workflow = await ingestAndRunToPlan(controller);
+		workflow = await controller.performAction({
+			workflowId: workflow.id,
+			expectedVersion: workflow.version,
+			action: "approve_plan",
+			actorId: "engineer-1",
+		});
+		workflow = await controller.runUntilGate(workflow.id);
+
+		expect(workflow.state).toBe("restricted_proposal_only");
+		expect(repository.operations).toEqual([
+			"inspect:implement",
+			"checks:implement",
+			"inspect:implement",
+		]);
+		const workspace = await controller.getStaffWorkspace(workflow.id);
+		const implementation = workspace?.artifacts.findLast(
+			(artifact) => artifact.stage === "implement",
+		);
+		expect(implementation?.tests.map((result) => result.status)).toEqual([
+			"passed",
+			"passed",
+		]);
+		expect(
+			implementation?.restrictedChanges.some(
+				(finding) =>
+					finding.category === "infrastructure" &&
+					finding.path === "src/generated-shell.nix",
+			),
+		).toBe(true);
+	});
+
+	test("replaces agent test claims with ordered trusted check results", async () => {
+		const agentClaim = {
+			command: "agent-claimed-tests",
+			status: "passed" as const,
+			summary: "The agent claimed these passed.",
+		};
+		const { controller, repository } = setup({
+			script: {
+				implement: [
+					stageOutput({
+						baseSha: "base-sha",
+						headSha: "candidate-sha",
+						tests: [agentClaim],
+					}),
+				],
+				qc: [
+					stageOutput({
+						baseSha: "base-sha",
+						headSha: "candidate-sha",
+						tests: [agentClaim],
+					}),
+				],
+			},
+		});
+		let workflow = await ingestAndRunToPlan(controller);
+		workflow = await controller.performAction({
+			workflowId: workflow.id,
+			expectedVersion: workflow.version,
+			action: "approve_plan",
+			actorId: "engineer-1",
+		});
+		workflow = await controller.runUntilGate(workflow.id);
+
+		expect(workflow.state).toBe("awaiting_human_review");
+		expect(repository.checkRuns.map((run) => run.stage)).toEqual([
+			"implement",
+			"qc",
+		]);
+		const workspace = await controller.getStaffWorkspace(workflow.id);
+		for (const stage of ["implement", "qc"] as const) {
+			const artifact = workspace?.artifacts.find(
+				(candidate) => candidate.stage === stage,
+			);
+			expect(artifact?.tests.map((result) => result.checkId)).toEqual([
+				"tests",
+				"check",
+			]);
+			expect(artifact?.tests.map((result) => result.command)).toEqual([
+				"bun test",
+				"bun run check",
+			]);
+			expect(
+				artifact?.tests.some((result) => result.command === agentClaim.command),
+			).toBe(false);
+		}
+	});
+
+	test("fails implementation when any configured trusted check is not passed", async () => {
+		const { controller, repository } = setup({
+			checkResults: {
+				implement: [
+					{
+						checkId: "tests",
+						status: "failed",
+						summary: "Unit tests failed.",
+					},
+				],
+			},
+		});
+		let workflow = await ingestAndRunToPlan(controller);
+		workflow = await controller.performAction({
+			workflowId: workflow.id,
+			expectedVersion: workflow.version,
+			action: "approve_plan",
+			actorId: "engineer-1",
+		});
+		workflow = await controller.runNext(workflow.id);
+
+		expect(workflow.state).toBe("failed_retryable");
+		expect(workflow.lastError).toContain("Unit tests, Static checks");
+		expect(repository.operations).toEqual([
+			"inspect:implement",
+			"checks:implement",
+			"inspect:implement",
+		]);
+		const workspace = await controller.getStaffWorkspace(workflow.id);
+		expect(
+			workspace?.artifacts.at(-1)?.tests.map((test) => test.status),
+		).toEqual(["failed", "not_run"]);
+	});
+
+	test("requests implementation changes when any QC check is not passed", async () => {
+		const { controller } = setup({
+			checkResults: {
+				qc: [
+					{
+						checkId: "tests",
+						status: "failed",
+						summary: "Unit tests failed during QC.",
+					},
+				],
+			},
+		});
+		let workflow = await ingestAndRunToPlan(controller);
+		workflow = await controller.performAction({
+			workflowId: workflow.id,
+			expectedVersion: workflow.version,
+			action: "approve_plan",
+			actorId: "engineer-1",
+		});
+		workflow = await controller.runNext(workflow.id);
+		expect(workflow.state).toBe("draft_pr_open");
+		workflow = await controller.runNext(workflow.id);
+
+		expect(workflow.state).toBe("changes_requested");
+		expect(workflow.qcLoops).toBe(1);
+		const workspace = await controller.getStaffWorkspace(workflow.id);
+		const qc = workspace?.artifacts.findLast(
+			(artifact) => artifact.stage === "qc",
+		);
+		expect(qc?.decision).toBe("changes_requested");
+		expect(qc?.tests.map((test) => test.status)).toEqual(["failed", "not_run"]);
 	});
 
 	test("escalates P0 before code work even if an agent misses it", async () => {
@@ -379,6 +577,9 @@ describe("support workflow controller", () => {
 		workflow = await qcSetup.controller.runUntilGate(workflow.id);
 		expect(workflow.state).toBe("failed_retryable");
 		expect(workflow.lastError).toContain("different commit SHA");
+		expect(qcSetup.repository.checkRuns.map((run) => run.stage)).toEqual([
+			"implement",
+		]);
 
 		const stagingSetup = setup({
 			script: {
@@ -700,7 +901,7 @@ describe("support workflow controller", () => {
 		expect(idempotencyKeys[0]).toBe(idempotencyKeys[1]);
 	});
 
-	test("holds oversized untrusted input for manual review without calling QM", async () => {
+	test("holds oversized untrusted input for manual review without calling an agent", async () => {
 		const { controller, runtime } = setup();
 		const job = ingressJob({
 			issue: {

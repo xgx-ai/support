@@ -153,16 +153,28 @@ export type SupportEvidence = z.infer<typeof supportEvidenceSchema>;
 export const supportLinkSchema = z.object({
 	label: z.string().min(1),
 	url: httpUrlSchema,
-	kind: z.enum(["qm", "pull_request", "check", "deployment", "other"]),
+	kind: z.enum(["agent_run", "pull_request", "check", "deployment", "other"]),
 });
 export type SupportLink = z.infer<typeof supportLinkSchema>;
 
+const executionIdentifierSchema = z
+	.string()
+	.regex(/^[a-z0-9][a-z0-9._-]{0,127}$/);
+
 export const testResultSchema = z.object({
+	checkId: executionIdentifierSchema.optional(),
 	command: z.string().min(1),
 	status: z.enum(["passed", "failed", "not_run"]),
 	summary: z.string().min(1),
 });
 export type TestResult = z.infer<typeof testResultSchema>;
+
+export const repositoryCheckResultSchema = z.object({
+	checkId: executionIdentifierSchema,
+	status: z.enum(["passed", "failed", "not_run"]),
+	summary: z.string().min(1).max(4_000),
+});
+export type RepositoryCheckResult = z.infer<typeof repositoryCheckResultSchema>;
 
 export const restrictedChangeSchema = z.object({
 	category: restrictedChangeCategorySchema,
@@ -174,7 +186,7 @@ export const restrictedChangeSchema = z.object({
 export type RestrictedChange = z.infer<typeof restrictedChangeSchema>;
 
 /**
- * Structured output returned by every QM support stage.
+ * Structured output returned by every support agent stage.
  * Workflow transitions are derived from this artifact by trusted code; the
  * agent's decision is only a recommendation.
  */
@@ -277,16 +289,86 @@ export const agentStageOutputSchema = agentArtifactEnvelopeSchema.omit({
 });
 export type AgentStageOutput = z.infer<typeof agentStageOutputSchema>;
 
+const repositorySubdirSchema = z
+	.string()
+	.min(1)
+	.max(256)
+	.refine(
+		(value) =>
+			value === "." ||
+			(!value.startsWith("/") &&
+				!value.includes("\\") &&
+				!value.includes("\0") &&
+				!value.endsWith("/") &&
+				value
+					.split("/")
+					.every(
+						(segment) =>
+							segment !== "" &&
+							segment !== "." &&
+							segment !== ".." &&
+							/^[A-Za-z0-9._+-]+$/.test(segment),
+					)),
+		"Path must be a safe repository-relative subdirectory",
+	);
+
+export const nixExecutionCheckSchema = z.object({
+	id: executionIdentifierSchema,
+	label: z.string().trim().min(1).max(160),
+	argv: z
+		.array(
+			z
+				.string()
+				.min(1)
+				.max(2_000)
+				.refine((value) => !value.includes("\0"), "argv cannot contain NUL"),
+		)
+		.min(1)
+		.max(64),
+});
+export type NixExecutionCheck = z.infer<typeof nixExecutionCheckSchema>;
+
+export const nixExecutionProfileSchema = z
+	.object({
+		kind: z.literal("nix-dev-shell"),
+		profileId: executionIdentifierSchema,
+		flakeSubdir: repositorySubdirSchema,
+		workspaceSubdir: repositorySubdirSchema,
+		devShell: z
+			.string()
+			.regex(/^[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$/)
+			.refine((value) => value.toLowerCase() !== "default", {
+				message: "A named non-default devShell is required",
+			}),
+		timeoutMs: z.number().int().min(1_000).max(1_800_000),
+		checks: z.array(nixExecutionCheckSchema).min(1).max(20),
+	})
+	.superRefine((profile, context) => {
+		const seen = new Set<string>();
+		for (const [index, check] of profile.checks.entries()) {
+			if (!seen.has(check.id)) {
+				seen.add(check.id);
+				continue;
+			}
+			context.addIssue({
+				code: "custom",
+				path: ["checks", index, "id"],
+				message: `Duplicate execution check id ${check.id}`,
+			});
+		}
+	});
+export type NixExecutionProfile = z.infer<typeof nixExecutionProfileSchema>;
+
 export const supportRouteSchema = z
 	.object({
 		id: z.string().min(1),
 		targetRepository: z.string().regex(/^[^/]+\/[^/]+$/),
 		baseBranch: z.string().min(1),
-		qmScope: z.string().min(1),
+		agentScope: z.string().min(1),
 		automationMode: automationModeSchema,
 		allowedPaths: z.array(z.string().min(1)).min(1),
 		forbiddenPaths: z.array(z.string().min(1)).default([]),
-		testCommands: z.array(z.string().min(1)).min(1),
+		executionProfile: nixExecutionProfileSchema,
 		stagingEnvironment: z.string().min(1).optional(),
 		productionEnvironment: z.string().min(1).optional(),
 		deployAdapter: z.string().min(1).optional(),

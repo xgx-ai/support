@@ -61,6 +61,17 @@
               bun install --silent
             '';
           };
+
+          # Trusted support-agent checks enter this named shell explicitly.
+          # Keep it side-effect free: dependency installation and Git tooling do
+          # not belong in the automated verification boundary.
+          support = mkShell {
+            packages = [
+              bun
+              biome
+              typescript-go
+            ];
+          };
         }
     );
   };

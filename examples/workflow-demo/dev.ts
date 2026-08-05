@@ -4,26 +4,28 @@ import { workflowActionSchema } from "../../packages/support-workflow/src/contra
 import { buildDemo, demoDist } from "./build.ts";
 import {
 	createLocalWorkflowLab,
-	type LocalQmMode,
+	type LocalAgentMode,
 	localScenarioNames,
 } from "./lab.ts";
 
 await buildDemo();
 
-const configuredMode = Bun.env.SUPPORT_QM_MODE;
-const mode: LocalQmMode =
+const configuredMode = Bun.env.SUPPORT_AGENT_MODE;
+const mode: LocalAgentMode =
 	configuredMode === "mock"
-		? "qm-mock"
+		? "agent-mock"
 		: configuredMode === "live"
-			? "qm-live"
+			? "agent-live"
 			: "scripted";
-const qmUrl = Bun.env.QM_BASE_URL;
+const agentUrl = Bun.env.SUPPORT_AGENT_BASE_URL;
 const lab = createLocalWorkflowLab({
 	mode,
-	qmUrl,
-	qmSigningSecret: Bun.env.QM_SIGNING_SECRET,
+	agentUrl,
+	agentSigningSecret: Bun.env.SUPPORT_AGENT_SIGNING_SECRET,
+	workspaceRoot: Bun.env.SUPPORT_AGENT_WORKSPACE_ROOT,
 });
-await lab.reset("happy");
+if (mode === "agent-live") await lab.initialize("happy");
+else await lab.reset("happy");
 
 const resetInputSchema = z.object({
 	scenario: z.enum(localScenarioNames).default("happy"),
@@ -35,6 +37,15 @@ const actionInputSchema = z.object({
 });
 const appIdSchema = z.string().regex(/^[a-z0-9-]+$/);
 const issueNumberSchema = z.coerce.number().int().positive();
+const runtimeHealthSchema = z.object({
+	sandbox: z
+		.object({
+			required: z.boolean(),
+			configured: z.boolean(),
+			access: z.array(z.enum(["read_only", "candidate_write"])),
+		})
+		.optional(),
+});
 
 function pathSegments(pathname: string): string[] | null {
 	try {
@@ -67,19 +78,26 @@ function serializeMutation<T>(operation: () => Promise<T>): Promise<T> {
 	return pending;
 }
 
-async function qmHealth() {
-	if (!qmUrl || mode === "scripted") return { state: "not_started" as const };
+async function agentHealth() {
+	if (!agentUrl || mode === "scripted")
+		return { state: "not_started" as const };
 	try {
-		const response = await fetch(`${qmUrl.replace(/\/$/, "")}/healthz`, {
+		const response = await fetch(`${agentUrl.replace(/\/$/, "")}/healthz`, {
 			signal: AbortSignal.timeout(1_000),
 		});
-		return response.ok
-			? { state: "healthy" as const, url: qmUrl }
-			: { state: "unhealthy" as const, url: qmUrl };
+		if (!response.ok) return { state: "unhealthy" as const, url: agentUrl };
+		const health = runtimeHealthSchema.safeParse(await response.json());
+		return {
+			state: "healthy" as const,
+			url: agentUrl,
+			...(health.success && health.data.sandbox
+				? { sandbox: health.data.sandbox }
+				: {}),
+		};
 	} catch (error) {
 		return {
 			state: "unhealthy" as const,
-			url: qmUrl,
+			url: agentUrl,
 			error: errorMessage(error),
 		};
 	}
@@ -100,7 +118,7 @@ const server = Bun.serve({
 		if (request.method === "GET" && url.pathname === "/api/dev/status") {
 			return json({
 				runtime: await lab.status(),
-				qm: await qmHealth(),
+				agent: await agentHealth(),
 			});
 		}
 		if (request.method === "GET" && url.pathname === "/api/workflow") {
@@ -163,7 +181,11 @@ const server = Bun.serve({
 		if (request.method === "POST" && url.pathname === "/api/workflow/reset") {
 			try {
 				const input = resetInputSchema.parse(await request.json());
-				const view = await serializeMutation(() => lab.reset(input.scenario));
+				const view = await serializeMutation(() =>
+					mode === "agent-live"
+						? lab.initialize(input.scenario)
+						: lab.reset(input.scenario),
+				);
 				return json({ view });
 			} catch (error) {
 				return json({ error: errorMessage(error) }, 400);
@@ -201,5 +223,5 @@ const server = Bun.serve({
 });
 
 console.log(
-	`Staff workflow demo available at ${server.url} (runtime=${mode}${qmUrl ? `, qm=${qmUrl}` : ""})`,
+	`Staff workflow demo available at ${server.url} (runtime=${mode}${agentUrl ? `, agent=${agentUrl}` : ""})`,
 );

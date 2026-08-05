@@ -220,7 +220,7 @@ function AgentActivityEntry(props: {
 /**
  * Staff-only presentation of curated agent workflow activity.
  *
- * This component intentionally has no issue-comment or QM API access. Render it
+ * This component intentionally has no issue-comment or agent runtime API access. Render it
  * only from a staff-authorised route and supply data from a staff-authorised
  * server procedure.
  */

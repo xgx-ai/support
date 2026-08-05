@@ -17,7 +17,7 @@ import {
 	createStaticSupportRouteResolver,
 } from "./testing";
 
-describe("GitHub webhook to QM workflow integration", () => {
+describe("GitHub webhook to agent workflow integration", () => {
 	test("replays a signed webhook, enqueues quickly, then runs agents in the worker", async () => {
 		const secret = "webhook-secret";
 		const queue = createInMemoryWorkflowQueue();
@@ -26,11 +26,25 @@ describe("GitHub webhook to QM workflow integration", () => {
 				id: "auno",
 				targetRepository: "example/auno",
 				baseBranch: "main",
-				qmScope: "team:support",
+				agentScope: "team:support",
 				automationMode: "full",
 				allowedPaths: ["src/**"],
 				forbiddenPaths: [],
-				testCommands: ["bun test"],
+				executionProfile: {
+					kind: "nix-dev-shell",
+					profileId: "auno-support-v1",
+					flakeSubdir: ".",
+					workspaceSubdir: ".",
+					devShell: "support",
+					timeoutMs: 600_000,
+					checks: [
+						{
+							id: "tests",
+							label: "Unit tests",
+							argv: ["bun", "test"],
+						},
+					],
+				},
 				stagingEnvironment: "staging",
 				productionEnvironment: "production",
 				deployAdapter: "github-actions",
@@ -94,11 +108,25 @@ describe("GitHub webhook to QM workflow integration", () => {
 				id: "auno",
 				targetRepository: "example/auno",
 				baseBranch: "main",
-				qmScope: "team:support",
+				agentScope: "team:support",
 				automationMode: "full",
 				allowedPaths: ["src/**"],
 				forbiddenPaths: [],
-				testCommands: ["bun test"],
+				executionProfile: {
+					kind: "nix-dev-shell",
+					profileId: "auno-support-v1",
+					flakeSubdir: ".",
+					workspaceSubdir: ".",
+					devShell: "support",
+					timeoutMs: 600_000,
+					checks: [
+						{
+							id: "tests",
+							label: "Unit tests",
+							argv: ["bun", "test"],
+						},
+					],
+				},
 			},
 		});
 		const enqueue = createSupportWorkflowWebhookEnqueuer({
@@ -150,11 +178,25 @@ describe("GitHub webhook to QM workflow integration", () => {
 				id: "auno",
 				targetRepository: "example/auno",
 				baseBranch: "main",
-				qmScope: "team:support",
+				agentScope: "team:support",
 				automationMode: "full",
 				allowedPaths: ["src/**"],
 				forbiddenPaths: [],
-				testCommands: ["bun test"],
+				executionProfile: {
+					kind: "nix-dev-shell",
+					profileId: "auno-support-v1",
+					flakeSubdir: ".",
+					workspaceSubdir: ".",
+					devShell: "support",
+					timeoutMs: 600_000,
+					checks: [
+						{
+							id: "tests",
+							label: "Unit tests",
+							argv: ["bun", "test"],
+						},
+					],
+				},
 			},
 		});
 		const enqueue = createSupportWorkflowWebhookEnqueuer({ queue, routes });

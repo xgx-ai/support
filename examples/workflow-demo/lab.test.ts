@@ -1,7 +1,33 @@
 import { describe, expect, test } from "bun:test";
-import { createLocalWorkflowLab } from "./lab.ts";
+import { createLocalWorkflowLab, localRepositoryDirectory } from "./lab.ts";
 
 describe("Bun local workflow lab", () => {
+	test("requires an explicit full repository mapping", () => {
+		expect(localRepositoryDirectory("xgx-ai/ama-app")).toBe("ama-app");
+		expect(() => localRepositoryDirectory("another-owner/ama-app")).toThrow(
+			"No local repository mapping",
+		);
+		expect(() => localRepositoryDirectory("owner/.")).toThrow(
+			"No local repository mapping",
+		);
+	});
+
+	test("waits for an explicit action before running live-style agents", async () => {
+		const lab = createLocalWorkflowLab({ mode: "scripted" });
+		const view = await lab.initialize("happy");
+		expect(view.availableActions.map((action) => action.id)).toContain(
+			"run_next",
+		);
+		expect((await lab.status()).agentStages).toEqual([]);
+		const amaTickets = await lab.listTickets("ama");
+		expect(
+			amaTickets?.find((ticket) => ticket.issueNumber === 4821),
+		).toMatchObject({
+			status: "new",
+			requiresReview: false,
+		});
+	});
+
 	test("moves through every human gate without external side effects", async () => {
 		const lab = createLocalWorkflowLab({ mode: "scripted" });
 		let view = await lab.reset("happy");
@@ -92,6 +118,7 @@ describe("Bun local workflow lab", () => {
 			app: { id: "dms" },
 			ticket: { source: "sample", status: "blocked" },
 		});
+		expect(sample?.workflow.workflow.title).toContain("#2306");
 		expect(sample?.workflow.items.some((item) => item.stage === "qc")).toBe(
 			true,
 		);

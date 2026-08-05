@@ -1,4 +1,0 @@
-interface:
-  display_name: "Support Investigate"
-  short_description: "Investigate code and propose changes"
-  default_prompt: "Use $support-investigate to inspect the target repository and produce an evidence-backed change plan."

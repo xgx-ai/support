@@ -1,7 +1,10 @@
+import type { AgentClient, AgentTurnRequest } from "./agent-client";
+import { parseAgentStageOutput } from "./agent-runtime";
 import {
 	type AgentArtifact,
 	type AgentStage,
 	type AgentStageOutput,
+	type RepositoryCheckResult,
 	SUPPORT_WORKFLOW_VERSION,
 	type SupportRoute,
 	type WorkflowActivity,
@@ -20,13 +23,12 @@ import type {
 	RepositoryChangeSet,
 	RepositoryPort,
 	RepositoryStageWorkspace,
+	RunRepositoryChecksInput,
 	SupportRouteResolver,
 	WorkflowIngressJob,
 	WorkflowQueue,
 	WorkflowStore,
 } from "./ports";
-import type { QmClient, QmTurnRequest } from "./qm-client";
-import { parseAgentStageOutput } from "./qm-runtime";
 
 function copy<T>(value: T): T {
 	return structuredClone(value);
@@ -335,7 +337,7 @@ export function createScriptedAgentRuntime(input?: {
 				artifactId: ids.next("artifact"),
 				workflowId: request.workflow.id,
 				issueSnapshotHash: request.workflow.issueSnapshotHash,
-				runId: ids.next("qm-run"),
+				runId: ids.next("agent-run"),
 				stage: request.stage,
 				createdAt: clock.now().toISOString(),
 				visibility:
@@ -346,14 +348,14 @@ export function createScriptedAgentRuntime(input?: {
 }
 
 /**
- * Runs deterministic stage artifacts through QM's signed HTTP and screening
- * boundary. This is deliberately a local-development adapter: QM's mock
+ * Runs deterministic stage artifacts through the agent runtime's signed HTTP
+ * and screening boundary. This is deliberately a local-development adapter: the mock
  * harness performs no repository or model work, while the real controller,
  * source auth, async run worker, idempotency, and fail-closed screening remain
  * exercised.
  */
-export function createQmMockAgentRuntime(input: {
-	client: QmClient;
+export function createAgentMockRuntime(input: {
+	client: AgentClient;
 	clock?: Clock;
 	ids?: IdGenerator;
 	outputForRequest?: (
@@ -377,7 +379,7 @@ export function createQmMockAgentRuntime(input: {
 				isBot: true,
 			};
 			const threadRef = `support-dev:${request.workflow.id}:${request.stage}:${request.attempt}`;
-			const turn: QmTurnRequest = {
+			const turn: AgentTurnRequest = {
 				surface: "support-dev",
 				actor,
 				conversation: {
@@ -402,6 +404,14 @@ export function createQmMockAgentRuntime(input: {
 				requireSecurityScreen: true,
 				idempotencyKey: request.idempotencyKey,
 				async: true,
+				...(request.workspace
+					? {
+							workspace: {
+								path: request.workspace.workspaceRef,
+								access: request.workspace.access,
+							},
+						}
+					: {}),
 				harness: "mock",
 			};
 			const completion = await input.client.runTurn(turn);
@@ -409,9 +419,9 @@ export function createQmMockAgentRuntime(input: {
 			const links = [...output.links];
 			if (completion.adminUrl) {
 				links.push({
-					label: "Open in QM",
+					label: "Open agent run",
 					url: completion.adminUrl,
-					kind: "qm",
+					kind: "agent_run",
 				});
 			}
 			return {
@@ -434,10 +444,21 @@ export function createQmMockAgentRuntime(input: {
 export function createFakeRepositoryPort(input?: {
 	baseSha?: string;
 	changeSet?: RepositoryChangeSet;
+	inspectChangeSets?: RepositoryChangeSet[];
+	checkResults?: Partial<
+		Record<Extract<AgentStage, "implement" | "qc">, RepositoryCheckResult[]>
+	>;
 }): RepositoryPort & {
 	setChangeSet(changeSet: RepositoryChangeSet): void;
+	setInspectChangeSets(changeSets: RepositoryChangeSet[]): void;
+	setCheckResults(
+		stage: Extract<AgentStage, "implement" | "qc">,
+		results: RepositoryCheckResult[],
+	): void;
 	setMergeVerification(valid: boolean): void;
 	workspaces: RepositoryStageWorkspace[];
+	checkRuns: RunRepositoryChecksInput[];
+	operations: string[];
 } {
 	const baseSha = input?.baseSha ?? "base-sha";
 	let mergeIsValid = true;
@@ -446,9 +467,22 @@ export function createFakeRepositoryPort(input?: {
 		headSha: "candidate-sha",
 		changedPaths: ["src/support-fix.ts", "src/support-fix.test.ts"],
 	};
+	const inspectChangeSets = (input?.inspectChangeSets ?? []).map(copy);
+	const checkResults = new Map<
+		Extract<AgentStage, "implement" | "qc">,
+		RepositoryCheckResult[]
+	>(
+		Object.entries(input?.checkResults ?? {}) as Array<
+			[Extract<AgentStage, "implement" | "qc">, RepositoryCheckResult[]]
+		>,
+	);
 	const workspaces: RepositoryStageWorkspace[] = [];
+	const checkRuns: RunRepositoryChecksInput[] = [];
+	const operations: string[] = [];
 	return {
 		workspaces,
+		checkRuns,
+		operations,
 		async getBaseSha() {
 			return baseSha;
 		},
@@ -464,14 +498,32 @@ export function createFakeRepositoryPort(input?: {
 			return workspace;
 		},
 		async releaseStageWorkspace() {},
-		async inspectChanges() {
-			return copy(changeSet);
+		async runChecks(checkInput) {
+			operations.push(`checks:${checkInput.stage}`);
+			checkRuns.push(copy(checkInput));
+			const configured = checkResults.get(checkInput.stage);
+			if (configured) return copy(configured);
+			return checkInput.profile.checks.map((check) => ({
+				checkId: check.id,
+				status: "passed" as const,
+				summary: `${check.label} passed in the fake repository runner.`,
+			}));
+		},
+		async inspectChanges(_workflow, artifact) {
+			operations.push(`inspect:${artifact.stage}`);
+			return copy(inspectChangeSets.shift() ?? changeSet);
 		},
 		async verifyMergedSha() {
 			return mergeIsValid;
 		},
 		setChangeSet(next) {
 			changeSet = copy(next);
+		},
+		setInspectChangeSets(next) {
+			inspectChangeSets.splice(0, inspectChangeSets.length, ...next.map(copy));
+		},
+		setCheckResults(stage, results) {
+			checkResults.set(stage, copy(results));
 		},
 		setMergeVerification(valid) {
 			mergeIsValid = valid;

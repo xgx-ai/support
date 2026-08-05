@@ -1,3 +1,7 @@
+import { existsSync, realpathSync } from "node:fs";
+import { resolve, sep } from "node:path";
+import { createAgentClient } from "../../packages/support-workflow/src/agent-client.ts";
+import { createAgentRuntime } from "../../packages/support-workflow/src/agent-runtime.ts";
 import type {
 	AgentStageOutput,
 	AutomationMode,
@@ -14,17 +18,15 @@ import type {
 	AgentStageRequest,
 	WorkflowIngressJob,
 } from "../../packages/support-workflow/src/ports.ts";
-import { createQmClient } from "../../packages/support-workflow/src/qm-client.ts";
-import { createQmAgentRuntime } from "../../packages/support-workflow/src/qm-runtime.ts";
 import {
 	createStaffWorkflowPanelView,
 	type StaffWorkflowPanelView,
 } from "../../packages/support-workflow/src/staff-view.ts";
 import {
 	type AgentStageScript,
+	createAgentMockRuntime,
 	createFakeRepositoryPort,
 	createInMemoryWorkflowStore,
-	createQmMockAgentRuntime,
 	createRecordingDeploymentPort,
 	createRecordingResponsePublisher,
 	createScriptedAgentRuntime,
@@ -54,11 +56,11 @@ export const localScenarioNames = [
 ] as const;
 
 export type LocalScenarioName = (typeof localScenarioNames)[number];
-export type LocalQmMode = "qm-mock" | "qm-live" | "scripted";
+export type LocalAgentMode = "agent-mock" | "agent-live" | "scripted";
 
 export interface LocalWorkflowLabStatus {
-	mode: LocalQmMode;
-	qmUrl?: string;
+	mode: LocalAgentMode;
+	agentUrl?: string;
 	workflowId?: string;
 	workflowState?: WorkflowRecord["state"];
 	agentStages: string[];
@@ -67,6 +69,7 @@ export interface LocalWorkflowLabStatus {
 }
 
 export interface LocalWorkflowLab {
+	initialize(scenario?: LocalScenarioName): Promise<StaffWorkflowPanelView>;
 	reset(scenario?: LocalScenarioName): Promise<StaffWorkflowPanelView>;
 	getView(): Promise<StaffWorkflowPanelView | null>;
 	performAction(input: {
@@ -214,11 +217,155 @@ const sampleScenarioById = new Map(
 		.map((scenario) => [scenario.id, scenario]),
 );
 
+const localRepositoryDirectories: Readonly<Record<string, string>> = {
+	"xgx-ai/ama-app": "ama-app",
+	"xgx-ai/dms": "dms",
+	"xgx-ai/support": "support",
+};
+
+export function localRepositoryDirectory(targetRepository: string): string {
+	const directory = localRepositoryDirectories[targetRepository];
+	if (!directory) {
+		throw new Error(
+			`No local repository mapping is configured for ${targetRepository}`,
+		);
+	}
+	return directory;
+}
+
+function localRepositoryPath(
+	workspaceRoot: string,
+	targetRepository: string,
+): string {
+	const canonicalRoot = realpathSync(resolve(workspaceRoot));
+	const candidate = resolve(
+		canonicalRoot,
+		localRepositoryDirectory(targetRepository),
+	);
+	if (!existsSync(candidate)) {
+		throw new Error(
+			`Local repository ${targetRepository} was not found at ${candidate}`,
+		);
+	}
+	const canonicalCandidate = realpathSync(candidate);
+	if (
+		canonicalCandidate === canonicalRoot ||
+		!canonicalCandidate.startsWith(`${canonicalRoot}${sep}`)
+	) {
+		throw new Error(
+			`Local repository ${targetRepository} resolves outside the workspace root`,
+		);
+	}
+	return canonicalCandidate;
+}
+
+async function readLocalGit(
+	repository: string,
+	arguments_: readonly string[],
+): Promise<string> {
+	const git = Bun.which("git");
+	if (!git)
+		throw new Error("Git is required to read the local repository HEAD");
+	const gitProcess = Bun.spawn({
+		cmd: [git, "--no-optional-locks", ...arguments_],
+		cwd: repository,
+		env: {
+			PATH: Bun.env.PATH,
+			GIT_CONFIG_GLOBAL: "/dev/null",
+			GIT_CONFIG_SYSTEM: "/dev/null",
+			GIT_OPTIONAL_LOCKS: "0",
+			GIT_TERMINAL_PROMPT: "0",
+		},
+		stdin: "ignore",
+		stdout: "pipe",
+		stderr: "pipe",
+	});
+	const [stdout, stderr, exitCode] = await Promise.all([
+		new Response(gitProcess.stdout).text(),
+		new Response(gitProcess.stderr).text(),
+		gitProcess.exited,
+	]);
+	if (exitCode !== 0) {
+		throw new Error(
+			stderr.trim() ||
+				`Could not inspect the local repository at ${repository}`,
+		);
+	}
+	return stdout.trim();
+}
+
+async function localRepositoryHead(repository: string): Promise<string> {
+	const canonicalRepository = realpathSync(repository);
+	const reportedTopLevel = await readLocalGit(canonicalRepository, [
+		"rev-parse",
+		"--show-toplevel",
+	]);
+	if (
+		!reportedTopLevel ||
+		realpathSync(reportedTopLevel) !== canonicalRepository
+	) {
+		throw new Error(
+			`Local repository top-level does not match its configured mapping: ${repository}`,
+		);
+	}
+	const revision = await readLocalGit(canonicalRepository, [
+		"rev-parse",
+		"--verify",
+		"HEAD",
+	]);
+	if (!/^[0-9a-f]{40,64}$/i.test(revision)) {
+		throw new Error(
+			`Could not read the local repository HEAD for ${repository}`,
+		);
+	}
+	return revision;
+}
+
+function createLocalReadOnlyRepositoryPort(workspaceRoot: string) {
+	const repository = createFakeRepositoryPort();
+	return {
+		...repository,
+		async getBaseSha(route: SupportRoute) {
+			return localRepositoryHead(
+				localRepositoryPath(workspaceRoot, route.targetRepository),
+			);
+		},
+		async prepareStageWorkspace(
+			input: Parameters<typeof repository.prepareStageWorkspace>[0],
+		) {
+			if (input.access !== "read_only") {
+				throw new Error(
+					"Local Codex mode does not provision writable repository workspaces",
+				);
+			}
+			const workspaceRef = localRepositoryPath(
+				workspaceRoot,
+				input.workflow.route.targetRepository,
+			);
+			const revision = await localRepositoryHead(workspaceRef);
+			if (revision !== input.targetRevision) {
+				throw new Error(
+					"Local repository HEAD changed before the read-only agent stage started",
+				);
+			}
+			const workspace = {
+				id: `local-read-${input.operationId}`,
+				targetRepository: input.workflow.route.targetRepository,
+				revision,
+				access: "read_only" as const,
+				workspaceRef,
+			};
+			repository.workspaces.push(structuredClone(workspace));
+			return workspace;
+		},
+	};
+}
+
 const fullRoute: SupportRoute = {
 	id: "bun-local-dev",
 	targetRepository: "xgx-ai/ama-app",
 	baseBranch: "main",
-	qmScope: "team:support-bun-local",
+	agentScope: "team:support-bun-local",
 	automationMode: "full",
 	allowedPaths: ["src/**", "test/**"],
 	forbiddenPaths: [
@@ -227,7 +374,26 @@ const fullRoute: SupportRoute = {
 		"**/bun.lock",
 		"**/migrations/**",
 	],
-	testCommands: ["bun run check", "bun run test"],
+	executionProfile: {
+		kind: "nix-dev-shell",
+		profileId: "bun-local-dev-v1",
+		flakeSubdir: ".",
+		workspaceSubdir: ".",
+		devShell: "support",
+		timeoutMs: 600_000,
+		checks: [
+			{
+				id: "check",
+				label: "Static checks",
+				argv: ["bun", "run", "check"],
+			},
+			{
+				id: "tests",
+				label: "Unit tests",
+				argv: ["bun", "run", "test"],
+			},
+		],
+	},
 	stagingEnvironment: "local-staging",
 	productionEnvironment: "local-production",
 	deployAdapter: "record-only-bun-dev",
@@ -242,9 +408,9 @@ function stageOutput(
 		risk: request.stage === "triage" ? ("r1" as const) : request.workflow.risk,
 		confidence: 0.96,
 		title: `${request.stage.replaceAll("_", " ")} complete`,
-		summary: `QM's Bun development runtime completed the ${request.stage.replaceAll("_", " ")} stage.`,
+		summary: `The Bun agent runtime completed the ${request.stage.replaceAll("_", " ")} stage.`,
 		details:
-			"This deterministic development artifact crossed QM source authentication, inbound screening, asynchronous execution, and the support controller boundary.",
+			"This deterministic development artifact crossed agent source authentication, inbound screening, asynchronous execution, and the support controller boundary.",
 		evidence: [
 			{
 				title: "Local development evidence",
@@ -291,7 +457,8 @@ function stageOutput(
 				{
 					command: "bun run test",
 					status: "passed",
-					summary: "Recorded by the local deterministic QM development lane.",
+					summary:
+						"Recorded by the local deterministic agent development lane.",
 				},
 			],
 		};
@@ -392,11 +559,14 @@ function liveTicketSummary(
 	view: StaffWorkflowPanelView,
 ): LocalSupportTicketSummary {
 	const { scenarioId: _scenarioId, ...summary } = seed;
+	const waitingToStart =
+		view.availableActions.some((action) => action.id === "run_next") &&
+		view.items.every((item) => item.stage === "intake");
 	return {
 		...summary,
 		labels: [...seed.labels],
 		updatedAt: view.workflow.updatedAt,
-		status: localStatusForWorkflow(view),
+		status: waitingToStart ? "new" : localStatusForWorkflow(view),
 		risk: view.workflow.risk,
 		requiresReview: view.availableActions.some((action) =>
 			reviewActions.has(action.id),
@@ -438,6 +608,8 @@ function sampleWorkflowView(
 	scenario: WorkflowDemoScenario,
 	decision?: LocalTicketDecision,
 ): StaffWorkflowPanelView {
+	const sampleText = (value: string) =>
+		value.replace(/\b(?:4821|4870)\b/g, String(seed.issueNumber));
 	const workflowId = `sample:${seed.appId}#${seed.issueNumber}`;
 	const baseVersion = scenario.confirmationContext.expectedVersion;
 	const expectedVersion = decision ? baseVersion + 1 : baseVersion;
@@ -479,14 +651,20 @@ function sampleWorkflowView(
 			...scenario.confirmationContext,
 			workflowId,
 			expectedVersion,
+			...(scenario.confirmationContext.destination
+				? {
+						destination: sampleText(scenario.confirmationContext.destination),
+					}
+				: {}),
 		},
 		workflow: {
-			title:
+			title: sampleText(
 				scenario.workflow.title ??
-				`Agent activity for issue #${seed.issueNumber}`,
+					`Agent activity for issue #${seed.issueNumber}`,
+			),
 			summary: decision
-				? `${scenario.workflow.summary} A local staff decision has been recorded.`
-				: scenario.workflow.summary,
+				? `${sampleText(scenario.workflow.summary)} A local staff decision has been recorded.`
+				: sampleText(scenario.workflow.summary),
 			status: decision
 				? decisionIsApproval || decision.action === "cancel"
 					? "completed"
@@ -501,7 +679,13 @@ function sampleWorkflowView(
 		items: [
 			...scenario.items.map((item) => ({
 				...item,
-				details: [...(item.details ?? [])],
+				title: sampleText(item.title),
+				summary: sampleText(item.summary),
+				details: (item.details ?? []).map((detail) => ({
+					...detail,
+					...(detail.label ? { label: sampleText(detail.label) } : {}),
+					value: sampleText(detail.value),
+				})),
 				links: [...(item.links ?? [])],
 			})),
 			...(decisionItem ? [decisionItem] : []),
@@ -518,9 +702,10 @@ function sampleWorkflowView(
 }
 
 export function createLocalWorkflowLab(options: {
-	mode: LocalQmMode;
-	qmUrl?: string;
-	qmSigningSecret?: string;
+	mode: LocalAgentMode;
+	agentUrl?: string;
+	agentSigningSecret?: string;
+	workspaceRoot?: string;
 }): LocalWorkflowLab {
 	const clock = { now: () => new Date() };
 	const sampleDecisions = new Map<string, LocalTicketDecision>();
@@ -533,16 +718,16 @@ export function createLocalWorkflowLab(options: {
 
 	const buildRuntime = (): LabRuntime => {
 		const ids = createSequentialIdGenerator();
-		if (options.mode === "qm-mock") {
-			if (!options.qmUrl || !options.qmSigningSecret) {
+		if (options.mode === "agent-mock") {
+			if (!options.agentUrl || !options.agentSigningSecret) {
 				throw new Error(
-					"QM mock mode requires its local URL and signing secret",
+					"Agent mock mode requires its local URL and signing secret",
 				);
 			}
-			return createQmMockAgentRuntime({
-				client: createQmClient({
-					baseUrl: options.qmUrl,
-					signingSecret: options.qmSigningSecret,
+			return createAgentMockRuntime({
+				client: createAgentClient({
+					baseUrl: options.agentUrl,
+					signingSecret: options.agentSigningSecret,
 					pollIntervalMs: 25,
 					timeoutMs: 30_000,
 				}),
@@ -551,17 +736,17 @@ export function createLocalWorkflowLab(options: {
 				outputForRequest: (request) => stageOutput(request, currentScenario),
 			});
 		}
-		if (options.mode === "qm-live") {
-			if (!options.qmUrl || !options.qmSigningSecret) {
+		if (options.mode === "agent-live") {
+			if (!options.agentUrl || !options.agentSigningSecret) {
 				throw new Error(
-					"QM live mode requires its local URL and signing secret",
+					"Agent live mode requires its local URL and signing secret",
 				);
 			}
 			const requests: AgentStageRequest[] = [];
-			const live = createQmAgentRuntime({
-				client: createQmClient({
-					baseUrl: options.qmUrl,
-					signingSecret: options.qmSigningSecret,
+			const live = createAgentRuntime({
+				client: createAgentClient({
+					baseUrl: options.agentUrl,
+					signingSecret: options.agentSigningSecret,
 				}),
 				clock,
 				ids,
@@ -601,10 +786,19 @@ export function createLocalWorkflowLab(options: {
 		deployment = createRecordingDeploymentPort();
 		responses = createRecordingResponsePublisher();
 		runtime = buildRuntime();
+		const repository = (() => {
+			if (options.mode !== "agent-live") return createFakeRepositoryPort();
+			if (!options.workspaceRoot) {
+				throw new Error(
+					"Agent live mode requires SUPPORT_AGENT_WORKSPACE_ROOT",
+				);
+			}
+			return createLocalReadOnlyRepositoryPort(options.workspaceRoot);
+		})();
 		controller = createSupportWorkflowController({
 			store,
 			runtime,
-			repository: createFakeRepositoryPort(),
+			repository,
 			deployment,
 			responses,
 			clock,
@@ -718,26 +912,38 @@ export function createLocalWorkflowLab(options: {
 		};
 	};
 
-	return {
-		async reset(scenario = "happy") {
-			currentScenario = scenario;
-			currentWorkflowId = undefined;
-			rebuild();
-			const routeMode: AutomationMode =
-				options.mode === "qm-live" ? "plan" : "full";
-			const ingested = await requireController().ingest(
-				ingressJob(scenario, routeMode),
-			);
-			if (!ingested.workflow)
-				throw new Error("Local workflow ingress was ignored");
-			currentWorkflowId = ingested.workflow.id;
+	const startWorkflow = async (
+		scenario: LocalScenarioName,
+		runToGate: boolean,
+	): Promise<StaffWorkflowPanelView> => {
+		currentScenario = scenario;
+		currentWorkflowId = undefined;
+		rebuild();
+		const routeMode: AutomationMode =
+			options.mode === "agent-live" ? "plan" : "full";
+		const ingested = await requireController().ingest(
+			ingressJob(scenario, routeMode),
+		);
+		if (!ingested.workflow)
+			throw new Error("Local workflow ingress was ignored");
+		currentWorkflowId = ingested.workflow.id;
+		if (runToGate) {
 			await requireController().runUntilGate(currentWorkflowId);
 			if (scenario === "stale") {
 				await requireController().ingest(ingressJob(scenario, routeMode, 2));
 			}
-			const view = await getView();
-			if (!view) throw new Error("Local workflow view was not created");
-			return view;
+		}
+		const view = await getView();
+		if (!view) throw new Error("Local workflow view was not created");
+		return view;
+	};
+
+	return {
+		async initialize(scenario = "happy") {
+			return startWorkflow(scenario, false);
+		},
+		async reset(scenario = "happy") {
+			return startWorkflow(scenario, true);
 		},
 		getView,
 		performAction: performCurrentAction,
@@ -804,7 +1010,7 @@ export function createLocalWorkflowLab(options: {
 				: undefined;
 			return {
 				mode: options.mode,
-				qmUrl: options.qmUrl,
+				agentUrl: options.agentUrl,
 				workflowId,
 				workflowState: view ? workspace?.workflow.state : undefined,
 				agentStages: runtime?.requests.map((request) => request.stage) ?? [],

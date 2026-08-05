@@ -1,6 +1,8 @@
 import type {
 	AgentArtifact,
 	AgentStage,
+	NixExecutionProfile,
+	RepositoryCheckResult,
 	StaffWorkflowWorkspace,
 	SupportIssueSnapshot,
 	SupportRoute,
@@ -107,7 +109,7 @@ export interface RepositoryStageWorkspace {
 	targetRepository: string;
 	revision: string;
 	access: "read_only" | "candidate_write";
-	/** Reference/path already provisioned inside the QM agent sandbox. */
+	/** Reference/path already provisioned inside the agent sandbox. */
 	workspaceRef: string;
 }
 
@@ -119,6 +121,13 @@ export interface PrepareRepositoryStageInput {
 	access: RepositoryStageWorkspace["access"];
 }
 
+export interface RunRepositoryChecksInput {
+	workflow: WorkflowRecord;
+	stage: Extract<AgentStage, "implement" | "qc">;
+	workspace: RepositoryStageWorkspace;
+	profile: NixExecutionProfile;
+}
+
 export interface RepositoryPort {
 	getBaseSha(route: SupportRoute): Promise<string>;
 	prepareStageWorkspace(
@@ -128,6 +137,7 @@ export interface RepositoryPort {
 		workspace: RepositoryStageWorkspace,
 		outcome: "completed" | "failed" | "cancelled",
 	): Promise<void>;
+	runChecks(input: RunRepositoryChecksInput): Promise<RepositoryCheckResult[]>;
 	inspectChanges(
 		workflow: WorkflowRecord,
 		artifact: AgentArtifact,

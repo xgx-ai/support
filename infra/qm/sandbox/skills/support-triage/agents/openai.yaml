@@ -1,4 +1,0 @@
-interface:
-  display_name: "Support Triage"
-  short_description: "Classify and route support cases"
-  default_prompt: "Use $support-triage to classify this validated support case and select its risk lane."

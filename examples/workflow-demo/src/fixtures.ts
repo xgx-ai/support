@@ -30,14 +30,14 @@ const intakeActivity: DemoActivity[] = [
 		id: "intake-created",
 		title: "Internal workflow created",
 		summary:
-			"Support issue #4821 was mirrored into the private workflow store. No QM output was written back to the customer-visible GitHub issue.",
+			"Support issue #4821 was mirrored into the private workflow store. No agent output was written back to the customer-visible GitHub issue.",
 		stage: "intake",
 		status: "completed",
 		visibility: "internal",
 		occurredAt: "2026-08-05T08:04:00.000Z",
 		details: [
 			{ label: "Source", value: "GitHub support issue #4821" },
-			{ label: "Internal run", value: "qm-run-01K1WZ8F8VM2" },
+			{ label: "Internal run", value: "agent-run-01K1WZ8F8VM2" },
 		],
 	},
 	{
@@ -99,14 +99,14 @@ export const workflowScenarios: WorkflowDemoScenario[] = [
 		description:
 			"A proposed code change is waiting for a staff member before implementation begins.",
 		confirmationContext: {
-			workflowId: "qm-workflow-4821",
+			workflowId: "agent-workflow-4821",
 			expectedVersion: 7,
 			target: "plan-sha256:7ee4b83",
 		},
 		workflow: {
 			title: "Issue #4821 · Priority badge missing",
 			summary:
-				"QM has validated and triaged the report. The implementation plan is private and paused at the human approval gate.",
+				"Agents have validated and triaged the report. The implementation plan is private and paused at the human approval gate.",
 			status: "awaiting_approval",
 			risk: "r2",
 			updatedAt: "2026-08-05T08:17:00.000Z",
@@ -143,7 +143,8 @@ export const workflowScenarios: WorkflowDemoScenario[] = [
 			{
 				id: "approve_plan",
 				label: "Approve plan",
-				description: "Allows implementation on an isolated branch.",
+				description:
+					"Allows implementation in an isolated candidate workspace.",
 				variant: "default",
 			},
 			{
@@ -160,14 +161,14 @@ export const workflowScenarios: WorkflowDemoScenario[] = [
 		description:
 			"Implementation remains private after an automated check finds a regression.",
 		confirmationContext: {
-			workflowId: "qm-workflow-4821",
+			workflowId: "agent-workflow-4821",
 			expectedVersion: 11,
 			target: "commit 82b1f7c",
 		},
 		workflow: {
 			title: "Issue #4821 · Priority badge missing",
 			summary:
-				"An approved patch was produced on an isolated branch, but QC has blocked it before human review.",
+				"An approved patch was produced in an isolated candidate workspace, but QC has blocked it before human review.",
 			status: "failed",
 			risk: "r2",
 			updatedAt: "2026-08-05T08:31:00.000Z",
@@ -179,13 +180,13 @@ export const workflowScenarios: WorkflowDemoScenario[] = [
 				id: "implementation-completed",
 				title: "Patch prepared",
 				summary:
-					"The implementation agent changed only the approved files on an isolated branch. Nothing was deployed or posted to GitHub.",
+					"The implementation agent changed only the approved files in an isolated candidate workspace. Nothing was deployed or posted to GitHub.",
 				stage: "implement",
 				status: "completed",
 				visibility: "internal",
 				occurredAt: "2026-08-05T08:26:00.000Z",
 				details: [
-					{ label: "Branch", value: "support/qm-4821-priority-label" },
+					{ label: "Branch", value: "support/agent-4821-priority-label" },
 					{ label: "Diff", value: "+17 / -4 lines across 2 files" },
 				],
 			},
@@ -238,14 +239,14 @@ export const workflowScenarios: WorkflowDemoScenario[] = [
 		description:
 			"A database or dependency requirement is documented, but never applied autonomously.",
 		confirmationContext: {
-			workflowId: "qm-workflow-4870",
+			workflowId: "agent-workflow-4870",
 			expectedVersion: 4,
 			target: "proposal-sha256:1db21f0",
 		},
 		workflow: {
 			title: "Issue #4870 · Search results are stale",
 			summary:
-				"QM found that the requested fix would require a protected database change, so the run is stopped as an R3 proposal.",
+				"The agent found that the requested fix would require a protected database change, so the run is stopped as an R3 proposal.",
 			status: "needs_human",
 			risk: "r3",
 			updatedAt: "2026-08-05T09:12:00.000Z",
@@ -255,11 +256,11 @@ export const workflowScenarios: WorkflowDemoScenario[] = [
 				...intakeActivity[0],
 				id: "restricted-intake",
 				summary:
-					"Support issue #4870 was mirrored into the private workflow store. No QM output was written back to the customer-visible GitHub issue.",
+					"Support issue #4870 was mirrored into the private workflow store. No agent output was written back to the customer-visible GitHub issue.",
 				occurredAt: "2026-08-05T08:52:00.000Z",
 				details: [
 					{ label: "Source", value: "GitHub support issue #4870" },
-					{ label: "Internal run", value: "qm-run-01K1X2YJ0YKW" },
+					{ label: "Internal run", value: "agent-run-01K1X2YJ0YKW" },
 				],
 			},
 			{
@@ -316,7 +317,7 @@ export const workflowScenarios: WorkflowDemoScenario[] = [
 		description:
 			"A reviewed change has passed staging and is waiting for a separate deploy decision.",
 		confirmationContext: {
-			workflowId: "qm-workflow-4821",
+			workflowId: "agent-workflow-4821",
 			expectedVersion: 16,
 			target: "commit 82b1f7c",
 			destination: "production",
@@ -389,7 +390,7 @@ export const workflowScenarios: WorkflowDemoScenario[] = [
 		description:
 			"A verified fix has a customer-safe draft, but publishing remains a human action.",
 		confirmationContext: {
-			workflowId: "qm-workflow-4821",
+			workflowId: "agent-workflow-4821",
 			expectedVersion: 20,
 			target: "response-sha256:3cc9c8a",
 			destination: "customer issue #4821",

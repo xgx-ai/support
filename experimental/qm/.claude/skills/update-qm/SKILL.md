@@ -1,1 +1,0 @@
-../../../.codex/skills/update-qm/SKILL.md

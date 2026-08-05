@@ -1,4 +1,24 @@
 export {
+	type AgentActorAssertion,
+	type AgentClient,
+	AgentClientError,
+	type AgentClientErrorKind,
+	type AgentFetch,
+	type AgentTurnCompletion,
+	type AgentTurnRequest,
+	type CreateAgentClientOptions,
+	canonicalAgentPayload,
+	createAgentClient,
+	signAgentSourceRequest,
+} from "./agent-client";
+export {
+	type CreateAgentRuntimeOptions,
+	createAgentRuntime,
+	createSupportStagePrompt,
+	parseAgentStageOutput,
+	stageWorkspaceRequirement,
+} from "./agent-runtime";
+export {
 	type AgentArtifact,
 	type AgentStage,
 	type AgentStageOutput,
@@ -12,9 +32,15 @@ export {
 	assertStageDecision,
 	automationModeSchema,
 	httpUrlSchema,
+	type NixExecutionCheck,
+	type NixExecutionProfile,
+	nixExecutionCheckSchema,
+	nixExecutionProfileSchema,
+	type RepositoryCheckResult,
 	type RestrictedChange,
 	type RestrictedChangeCategory,
 	type RiskLevel,
+	repositoryCheckResultSchema,
 	riskLevelSchema,
 	type StaffWorkflowWorkspace,
 	SUPPORT_WORKFLOW_VERSION,
@@ -70,30 +96,13 @@ export type {
 	RepositoryChangeSet,
 	RepositoryPort,
 	RepositoryStageWorkspace,
+	RunRepositoryChecksInput,
 	SupportRouteResolver,
 	WorkflowIngressJob,
 	WorkflowQueue,
 	WorkflowStore,
 	WorkflowStoreTransaction,
 } from "./ports";
-export {
-	type CreateQmClientOptions,
-	canonicalQmPayload,
-	createQmClient,
-	type QmClient,
-	QmClientError,
-	type QmClientErrorKind,
-	type QmFetch,
-	type QmTurnCompletion,
-	type QmTurnRequest,
-	signQmSourceRequest,
-} from "./qm-client";
-export {
-	type CreateQmAgentRuntimeOptions,
-	createQmAgentRuntime,
-	createSupportStagePrompt,
-	parseAgentStageOutput,
-} from "./qm-runtime";
 export {
 	createStaffWorkflowPanelView,
 	type StaffActivityStage,

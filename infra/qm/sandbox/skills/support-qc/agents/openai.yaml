@@ -1,4 +1,0 @@
-interface:
-  display_name: "Support QC"
-  short_description: "Independently review support changes"
-  default_prompt: "Use $support-qc to independently review this exact candidate SHA and its test evidence."

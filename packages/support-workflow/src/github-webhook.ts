@@ -52,7 +52,7 @@ const supportedEvents = new Set([
 ]);
 
 /**
- * Creates the fast webhook-to-queue adapter. It deliberately does not call QM
+ * Creates the fast webhook-to-queue adapter. It deliberately does not call an agent
  * or execute a workflow while the GitHub request is open.
  */
 export function createSupportWorkflowWebhookEnqueuer(

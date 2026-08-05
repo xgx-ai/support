@@ -2,28 +2,53 @@
 
 GitHub-backed support issue UI and backend helpers.
 
-## Experimental QM workflow
+## Support agent workflow
 
-The repository now contains a local-only, removable QM support workflow experiment with
-private validation, triage, investigation, implementation, QC, staging, deployment,
-production verification, and response stages. Agent activity stays in a staff-only panel;
-it is not written to customer-visible GitHub issue comments.
+Support includes a private, human-gated agent workflow for validating, triaging,
+investigating, implementing, reviewing, verifying, and responding to support tickets.
+The orchestration belongs to Support, and the small agent process lives in
+`packages/support-agent-runtime/`. It has no Slack integration, Fly machinery, cloud
+deployment engine, or repository-creation feature.
 
-Start the complete disposable development stack:
+Start the local stack:
 
 ```sh
 bun run dev
 ```
 
-This starts the editable QM core and the interactive staff workflow app under
-Bun. Open <http://127.0.0.1:4174>. The default QM mock mode crosses the real
-signed HTTP, input-screening, async-worker, controller, and approval boundaries,
-but uses deterministic artifacts and record-only external adapters. On a clean
-checkout, the launcher installs any missing locked dependencies before starting.
-Provider credentials are read from the ignored `infra/qm/.env` and are passed
-only to the QM process when a non-mock harness is selected. Put
-`SUPPORT_QM_HARNESS=codex` in that file to make Codex the persistent local mode;
-otherwise the clean-checkout default remains mock.
+Open <http://127.0.0.1:4174>, choose an application, open a ticket, and review the
+suggested fix or the agent activity. The default `mock` harness is deterministic and
+makes no model request. It still exercises the private runtime boundary, workflow
+controller, and human gates, and automatically prepares a fixture at its first review gate.
+Codex mode instead opens at intake and remains idle until **Run agents** is clicked.
+
+For local Codex turns, copy [`.env.example`](./.env.example) to the ignored root
+`.env`, then set `SUPPORT_AGENT_HARNESS=codex` and `OPENAI_API_KEY`. Plain
+`bun run dev` will use that configuration. The launcher passes the key only to the
+agent process; it is never returned to the browser.
+
+The agent harness does not require an external repository or code sandbox for every
+turn. Validation, triage, verification, deployment planning, and response drafting run
+without one. Investigation may optionally attach an existing repository read-only.
+Implementation and QC fail closed until a separate isolated candidate/check runner is
+available. Codex itself still runs each local process with its built-in read-only
+security sandbox; that process boundary is distinct from optional repository context
+and the future writable test runner.
+
+For live investigation, the launcher resolves an explicitly mapped existing sibling
+repository beneath `SUPPORT_AGENT_WORKSPACE_ROOT` (the parent of Support by default), verifies
+its Git top-level, and records its current HEAD without cloning, creating, committing, or
+pushing anything. Codex can read the existing working tree but cannot write it. The UI opens
+before any model request; click **Run agents** on the live ticket to start the private plan.
+Writable candidate execution remains disabled locally.
+
+Every application route owns an explicit Nix execution profile contract: a named dev shell,
+repository-relative working directory, timeout, and exact check argument arrays. Agents
+cannot invent commands or alter the profile. A production repository adapter must run those
+checks and replace model-reported test claims with observed results. The local Codex lane
+stops before implementation; mock mode uses deterministic fake check receipts to exercise the
+review UI. Changes to flakes, lockfiles, package manifests, migrations, databases, CI,
+infrastructure, authentication, secrets, or releases remain proposal-only.
 
 The command-line scenario runner remains available:
 
@@ -31,9 +56,10 @@ The command-line scenario runner remains available:
 bun run demo:workflow --scenario=happy
 ```
 
-See [the QM support workflow plan](./docs/qm-support-workflow.md) for architecture,
-visibility boundaries, rollout modes, production integration points, live QM source
-testing, and removal instructions.
+See [the support agent workflow plan](./docs/support-agent-workflow.md) for the
+architecture, visibility boundary, approval gates, Nix check profiles, rollout modes,
+and production integration points. Upstream attribution for the small amount adapted
+from QM is recorded in [the third-party provenance note](./docs/third-party/qm-v0.1.4.md).
 
 ## Webhook Setup
 

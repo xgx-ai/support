@@ -1,62 +1,112 @@
-# Staff workflow demo
+# Staff support workflow
 
-This local-only Solid application renders `AgentActivityPanel` with both a live
-in-memory workflow and fixed review fixtures. The live view calls a Bun API host
-which composes the real support controller with the editable QM source. GitHub,
-deployments, databases, and public responses remain record-only.
+This local Solid application presents the support workflow as an inbox:
 
-From the repository root, start QM and the app together:
+1. Choose an application.
+2. Review its new and active support tickets.
+3. Open a ticket to see the customer report, the suggested fix, and the private agent activity.
+4. Approve the current proposal or reject it with structured feedback when the workflow is at a human gate.
+
+Agent evidence, code suggestions, check results, and review notes remain in this staff-only
+surface. They are not posted to the customer-visible GitHub issue. Publishing a response is
+a separate, explicit human-gated action.
+
+## Run locally
+
+From the repository root:
 
 ```sh
 bun run dev
 ```
 
-Open [http://127.0.0.1:4174](http://127.0.0.1:4174). To use another local port,
-set `SUPPORT_WORKFLOW_DEMO_PORT`; set `SUPPORT_QM_PORT` to move the QM core. The
-launcher installs any missing locked dependencies on its first run.
+Open <http://127.0.0.1:4174>. The launcher starts the Support-owned runtime from
+`packages/support-agent-runtime/` and the staff application. It installs missing locked
+dependencies on first use. No external chat app, cloud machine, deployment stack, or new
+Git repository is created. In particular, this package contains no Slack or Fly integration.
 
-The default `SUPPORT_QM_HARNESS=mock` mode runs the real vendored QM HTTP server,
-HMAC source authentication, fail-closed input screening, deployment skills, and
-async worker under Bun. Its stage artifacts are deterministic, so it needs no
-model key or Docker and cannot change a repository. Use the scenario buttons to
-exercise the happy path, shadow mode, answer-only routing, restricted proposal,
-P0 escalation, repeated QC failure, and stale-input handling.
+The safe default is `SUPPORT_AGENT_HARNESS=mock`. It returns deterministic artifacts while
+exercising the runtime, controller, private activity model, and human gates without making a
+model request or external change, and automatically prepares the live fixture at its first
+review gate. Codex mode opens at intake and waits for **Run agents**.
 
-Real model mode is an explicit opt-in:
+To use Codex locally, copy the root `.env.example` to the ignored root `.env` and set:
 
-```sh
-SUPPORT_QM_HARNESS=codex bun run dev
+```dotenv
+SUPPORT_AGENT_HARNESS=codex
+OPENAI_API_KEY=your-local-key
 ```
 
-The launcher reads `OPENAI_API_KEY` from the gitignored `infra/qm/.env`; an
-explicit shell environment variable still takes precedence. You can also put
-`SUPPORT_QM_HARNESS=codex` in that file so the shorter `bun run dev` command uses
-Codex on every local run.
+Then run `bun run dev` again. `SUPPORT_AGENT_CODEX_BIN` can select a specific executable;
+otherwise the pinned local installation is used. The key is passed only to the agent process.
 
-Live mode is capped at planning in this local host. Repository-reading or
-code-writing stages additionally require a sandbox-aware repository adapter and
-QM's isolated Docker or Sprites sandbox; the Bun core does not make it safe to
-run an agent directly against the host checkout.
+## Execution boundaries
 
-To run only one side while diagnosing startup:
+The local flow keeps three different concepts separate. The Codex CLI read-only process
+sandbox is always on for every current model turn. An existing application repository is
+optional, read-only investigation context; reasoning, security screening, validation,
+triage, and non-repository planning work without that external workspace. Implementation and
+QC are different again: they require a future trusted adapter with an isolated writable
+candidate, a fresh read-only QC view, and server-owned Nix checks. That capability is not
+enabled by relaxing the Codex process sandbox.
+
+| Work | Codex process sandbox | Repository or candidate context | Nix/check runner |
+| --- | --- | --- | --- |
+| Screening, reasoning, validation, and triage | Read-only, always on | None | None |
+| Investigation and planning | Read-only, always on | Optional existing repository, read-only | None |
+| Implementation | Not enabled locally | Future isolated writable candidate | Required |
+| QC | Not enabled locally | Future fresh read-only candidate view | Required |
+| Verification, deploy-intent review, and response drafting | Read-only, always on | None | None |
+
+Live investigation uses an explicitly mapped existing sibling app repository beneath
+`SUPPORT_AGENT_WORKSPACE_ROOT` (Support's parent directory by default). It verifies the Git
+top-level, records the current HEAD, and exposes the existing working tree read-only; it does
+not clone, create, branch, commit, or push. The app opens before making any live model request.
+Click **Run agents** on the live ticket to start validation, triage, and investigation. Only
+the repository-backed investigation step receives that mapped application context.
+
+The local Codex harness accepts read-only turns and always invokes the Codex CLI read-only
+process sandbox. Implementation and QC remain disabled until a trusted repository adapter can
+provide a disposable candidate, a fresh review workspace, and isolated Nix execution;
+writable execution is not inferred from a credential or from ticket text.
+
+## Nix checks
+
+Each application has a server-owned Nix execution profile contract containing a named dev
+shell, flake and workspace subdirectories, a timeout, and exact check argument arrays. The
+model cannot change that profile or substitute a command. A production implementation/QC
+adapter must run those checks in the isolated candidate workspace and return the observations.
+The local Codex lane does not yet run implementation or QC; mock mode uses deterministic fake
+results to demonstrate the checks and review gates.
+
+Checks run from the Support repository during local development validate Support itself. They
+are not evidence that a ticket candidate passed its application profile. Candidate check
+evidence must come from the future trusted adapter running that exact profile in the isolated
+candidate environment.
+
+Nix files, `.envrc`, dependency manifests, lockfiles, migrations, database code, CI,
+infrastructure, authentication, secrets, and release files are protected. A ticket that needs
+one of those changes is shown as a proposal for separate human work rather than applied by an
+agent.
+
+## Useful local commands
+
+Run only the agent process:
 
 ```sh
-bun run dev:qm
+bun run dev:agent
+```
+
+Run only the staff application with its clearly labelled scripted fallback:
+
+```sh
 bun run dev:ui
 ```
 
-`dev:ui` intentionally falls back to the in-process scripted runtime when no QM
-URL and signing secret are supplied. The page labels that mode explicitly.
-
-To produce the static build without starting the local server:
+Build the application without starting a server:
 
 ```sh
 bun run --cwd examples/workflow-demo build
 ```
 
-The live action buttons exercise optimistic versions and every human gate. The
-fixed phase buttons continue to cover focused review states. Both views
-distinguish private activity from `public_candidate` output; nothing becomes a
-GitHub comment until a separately authorised production publisher is connected.
-
-![Staff workflow activity panel](../../docs/demo/agent-activity-panel.png)
+All demo deployment and publication adapters are record-only. Nothing in this application
+pushes a branch, opens a pull request, deploys, or comments on a customer issue.

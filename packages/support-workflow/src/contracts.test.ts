@@ -11,10 +11,24 @@ const route = {
 	id: "product",
 	targetRepository: "example/product",
 	baseBranch: "main",
-	qmScope: "team:support",
+	agentScope: "team:support",
 	allowedPaths: ["src/**"],
 	forbiddenPaths: [],
-	testCommands: ["bun test"],
+	executionProfile: {
+		kind: "nix-dev-shell",
+		profileId: "product-v1",
+		flakeSubdir: ".",
+		workspaceSubdir: ".",
+		devShell: "support",
+		timeoutMs: 300_000,
+		checks: [
+			{
+				id: "tests",
+				label: "Unit tests",
+				argv: ["bun", "test"],
+			},
+		],
+	},
 };
 
 describe("support route contract", () => {
@@ -55,6 +69,55 @@ describe("support route contract", () => {
 				deployAdapter: "github-actions",
 			}).success,
 		).toBe(true);
+	});
+
+	test("rejects unsafe or ambiguous Nix execution profiles", () => {
+		const firstCheck = route.executionProfile.checks[0];
+		if (!firstCheck) throw new Error("Test route must define a Nix check");
+		for (const field of ["flakeSubdir", "workspaceSubdir"] as const) {
+			for (const value of [
+				"/tmp/repo",
+				"../repo",
+				"src/../repo",
+				"C:repo",
+				"C:\\repo",
+				"src/quoted name",
+				"src/",
+			]) {
+				expect(
+					supportRouteSchema.safeParse({
+						...route,
+						automationMode: "plan",
+						executionProfile: {
+							...route.executionProfile,
+							[field]: value,
+						},
+					}).success,
+				).toBe(false);
+			}
+		}
+		for (const executionProfile of [
+			{ ...route.executionProfile, profileId: "Product Profile" },
+			{ ...route.executionProfile, devShell: "default" },
+			{ ...route.executionProfile, timeoutMs: 999 },
+			{ ...route.executionProfile, timeoutMs: 1_800_001 },
+			{
+				...route.executionProfile,
+				checks: [...route.executionProfile.checks, { ...firstCheck }],
+			},
+			{
+				...route.executionProfile,
+				checks: [{ ...firstCheck, argv: [] }],
+			},
+		]) {
+			expect(
+				supportRouteSchema.safeParse({
+					...route,
+					automationMode: "plan",
+					executionProfile,
+				}).success,
+			).toBe(false);
+		}
 	});
 });
 
@@ -104,7 +167,7 @@ describe("agent artifact contract", () => {
 	});
 
 	test("accepts only absolute HTTP(S) links", () => {
-		expect(httpUrlSchema.safeParse("https://qm.example/run/1").success).toBe(
+		expect(httpUrlSchema.safeParse("https://agent.example/run/1").success).toBe(
 			true,
 		);
 		expect(httpUrlSchema.safeParse("javascript:alert(1)").success).toBe(false);

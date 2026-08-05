@@ -1,4 +1,0 @@
-interface:
-  display_name: "Support Validate"
-  short_description: "Validate support cases and safety"
-  default_prompt: "Use $support-validate to validate this support case and return the exact internal JSON artifact."

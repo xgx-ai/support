@@ -71,6 +71,21 @@ const ciFiles = new Set([
 	"action.yaml",
 ]);
 
+const nixControlFiles = new Set([
+	".envrc",
+	".direnvrc",
+	"direnvrc",
+	"direnv.toml",
+	"nix.conf",
+	"flake.nix",
+	"flake.lock",
+	"devenv.nix",
+	"devenv.yaml",
+	"devenv.yml",
+	"devenv.json",
+	"devenv.lock",
+]);
+
 const generatedExtensions = new Set([
 	".bin",
 	".exe",
@@ -175,8 +190,9 @@ function categoryForPath(path: string): RestrictedChangeCategory | null {
 		) ||
 		fileName === "dockerfile" ||
 		fileName.startsWith("docker-compose") ||
-		fileName === "flake.nix" ||
-		fileName === "flake.lock"
+		fileName.endsWith(".nix") ||
+		nixControlFiles.has(fileName) ||
+		segments.some((segment) => segment === ".direnv" || segment === ".devenv")
 	) {
 		return "infrastructure";
 	}

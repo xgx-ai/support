@@ -17,14 +17,15 @@
 		"support-github-webhook-replay": "./packages/github-issues/src/webhook-replay-cli.ts"
 	},
 	"scripts": {
-		"check": "biome check . && tsgo -p packages/github-issues/tsconfig.json && tsgo -p packages/support-workflow/tsconfig.json && tsgo -p packages/support-ui/tsconfig.json",
+		"check": "biome check . && tsgo -p packages/github-issues/tsconfig.json && tsgo -p packages/support-workflow/tsconfig.json && tsgo -p packages/support-agent-runtime/tsconfig.json && tsgo -p packages/support-ui/tsconfig.json",
 		"dev": "bun scripts/dev.ts",
-		"dev:qm": "bun scripts/dev.ts --qm-only",
+		"dev:agent": "bun scripts/dev.ts --agent-only",
 		"dev:ui": "bun --cwd examples/workflow-demo --watch dev.ts",
 		"demo:workflow": "bun packages/support-workflow/src/demo-cli.ts",
 		"test": "bun test packages examples/workflow-demo/lab.test.ts"
 	},
 	"devDependencies": {
+		"@openai/codex": "0.144.5",
 		"@solidjs/web": "2.0.0-beta.14",
 		"@xgx/ui": "github:xgx-ai/ui#23363705933b258c183515c649524e822e5013eb",
 		"chart.js": "^4.5.1",

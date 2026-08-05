@@ -6,11 +6,25 @@ const route: SupportRoute = {
 	id: "product",
 	targetRepository: "example/product",
 	baseBranch: "main",
-	qmScope: "team:support",
+	agentScope: "team:support",
 	automationMode: "full",
 	allowedPaths: ["src/**", "tests/**"],
 	forbiddenPaths: ["src/owned-by-security/**"],
-	testCommands: ["bun test"],
+	executionProfile: {
+		kind: "nix-dev-shell",
+		profileId: "product-v1",
+		flakeSubdir: ".",
+		workspaceSubdir: ".",
+		devShell: "support",
+		timeoutMs: 300_000,
+		checks: [
+			{
+				id: "tests",
+				label: "Unit tests",
+				argv: ["bun", "test"],
+			},
+		],
+	},
 };
 
 describe("repository change policy", () => {
@@ -88,6 +102,30 @@ describe("repository change policy", () => {
 			{ category: "ci", path: "azure-pipelines.yaml" },
 			{ category: "ci", path: ".github/actions/setup/action.yml" },
 		]);
+	});
+
+	test("blocks Nix, direnv, and devenv control files at any depth", () => {
+		const paths = [
+			"shell.nix",
+			"apps/api/.envrc",
+			"apps/api/direnv.toml",
+			"tools/nix.conf",
+			"ops/devenv.yaml",
+			"apps/web/.direnv/cache",
+			"apps/web/.devenv/state",
+		];
+		const findings = evaluateRepositoryChanges(
+			{
+				baseSha: "base",
+				headSha: "head",
+				changedPaths: paths,
+			},
+			{ ...route, allowedPaths: ["**"] },
+		);
+
+		expect(findings.map(({ category, path }) => ({ category, path }))).toEqual(
+			paths.map((path) => ({ category: "infrastructure", path })),
+		);
 	});
 
 	test("blocks package, database, CI, infrastructure and out-of-scope changes", () => {
